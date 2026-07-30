@@ -44,7 +44,7 @@ def tela_login():
                 st.error("Usuário ou senha incorretos.")
 
 if not st.session_state['autenticado']:
-    col_l, col_c, col_r = st.columns()
+    col_l, col_c, col_r = st.columns(3)
     with col_c:
         tela_login()
     st.stop()
