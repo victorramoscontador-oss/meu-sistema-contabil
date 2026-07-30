@@ -13,14 +13,11 @@ st.set_page_config(page_title="Fluxo Assessoria Financeira", layout="wide", init
 st.markdown("""
     <style>
         @import url('https://googleapis.com');
-        
         html, body, [data-testid="stAppViewContainer"], .stWidgetLabel, p, div {
-            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+            font-family: 'Roboto', -apple-system, sans-serif !important;
             background-color: #FAFAFA !important;
             color: #1E293B !important;
-            letter-spacing: -0.1px !important;
         }
-        
         section[data-testid="stSidebar"] {
             background-color: #031F11 !important;
             border-right: 1px solid #0C2E19 !important;
@@ -29,20 +26,10 @@ st.markdown("""
             color: #F1F5F9 !important;
             font-size: 14px !important;
         }
-        section[data-testid="stSidebar"] .stSelectbox label {
-            color: #94A3B8 !important;
-            font-weight: 500 !important;
-            text-transform: uppercase !important;
-            font-size: 11px !important;
-            letter-spacing: 0.5px !important;
-        }
-        
         h1, h2, h3, [data-testid="stHeader"] {
             font-weight: 700 !important;
             color: #031F11 !important;
-            letter-spacing: -0.5px !important;
         }
-        
         div[data-testid="stForm"], div[data-testid="element-container"] > div.stAlert {
             background-color: #FFFFFF !important;
             border: 1px solid #E2E8F0 !important;
@@ -50,47 +37,22 @@ st.markdown("""
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
             padding: 28px !important;
         }
-        
         input, select, textarea {
             background-color: #FFFFFF !important;
             border: 1px solid #CBD5E1 !important;
             border-radius: 6px !important;
-            color: #0F172A !important;
             padding: 12px !important;
-            font-size: 14px !important;
         }
-        
         div.stButton > button {
             background: #031F11 !important;
             color: #FFFFFF !important;
             font-weight: 500 !important;
             text-transform: uppercase !important;
-            font-size: 13px !important;
-            letter-spacing: 0.8px !important;
-            padding: 12px 30px !important;
             border-radius: 6px !important;
-            border: 1px solid #031F11 !important;
-            transition: all 0.15s ease-in-out !important;
             width: 100% !important;
         }
         div.stButton > button:hover {
             background: #10B981 !important;
-            border-color: #10B981 !important;
-            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2) !important;
-        }
-        
-        div[data-testid="stDataFrame"] th {
-            background-color: #F8FAFC !important;
-            color: #475569 !important;
-            font-weight: 700 !important;
-            text-transform: uppercase !important;
-            font-size: 12px !important;
-            border-bottom: 2px solid #E2E8F0 !important;
-        }
-        div[data-testid="stDataFrame"] td {
-            font-size: 14px !important;
-            font-variant-numeric: tabular-nums !important;
-            border-bottom: 1px solid #E2E8F0 !important;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -141,8 +103,8 @@ if 'autenticado' not in st.session_state:
 def tela_login():
     st.markdown("""
         <div style='text-align: center; margin-bottom: 25px;'>
-            <h2 style='color: #031F11; margin: 0; font-size: 26px; font-weight:700; letter-spacing:-0.5px;'>FLUXO</h2>
-            <p style='color: #64748B; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 4px; font-weight: 500;'>Assessoria Financeira</p>
+            <h2 style='color: #031F11; margin: 0; font-size: 26px; font-weight:700;'>FLUXO</h2>
+            <p style='color: #64748B; font-size: 12px; text-transform: uppercase; margin-top: 4px;'>Assessoria Financeira</p>
         </div>
     """, unsafe_allow_html=True)
     with st.form("login_form"):
@@ -161,8 +123,8 @@ if not st.session_state['autenticado']:
 
 st.sidebar.markdown("""
     <div style='text-align: center; padding: 20px 0; border-bottom: 1px solid #0C2E19; margin-bottom: 25px;'>
-        <h3 style='color: #FFFFFF; margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.5px;'>FLUXO ASSESSORIA</h3>
-        <span style='color: #10B981; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;'>Sistema de Controle Particular</span>
+        <h3 style='color: #FFFFFF; margin: 0; font-size: 18px; font-weight: 700;'>FLUXO ASSESSORIA</h3>
+        <span style='color: #10B981; font-size: 10px; font-weight: 700; text-transform: uppercase;'>Sistema Particular</span>
     </div>
 """, unsafe_allow_html=True)
 
@@ -230,7 +192,7 @@ if choice == "Cadastros Base":
             st.markdown("**Adicionar Nova Conta**")
             with st.form("new_acc"):
                 n_red = st.text_input("Código Reduzido")
-                n_est = st.text_input("Classificação / Máscara (Ex: 1.1.1.01.0001)")
+                n_est = st.text_input("Classificação / Máscara")
                 n_nome = st.text_input("Nome da Conta")
                 n_grp = st.selectbox("Grupo Contábil", ["Ativo", "Passivo", "PL", "Receita", "Despesa"])
                 if st.form_submit_button("Adicionar Conta"):
@@ -273,7 +235,7 @@ elif choice == "Lançamento de Notas":
         
         if st.form_submit_button("Processar e Gerar Lançamento Contábil"):
             if part_df.empty or acum_df.empty:
-                st.error("Erro: Cadastre um Participante e um Acumulador antes de processar notas.")
+                st.error("Erro: Cadastre um Participante e um Acumulador antes de lançar.")
             else:
                 id_p = int(participante_sel.split(" - "))
                 nome_p, conta_especifica_p = dict_part[id_p]
@@ -359,48 +321,40 @@ elif choice == "Importação OFX (Banco)":
 elif choice == "Demonstrações Contábeis":
     st.subheader("📋 Demonstrativos Oficiais (Padrão Normas Contábeis)")
     diario_completo = run_query("diario")
-    
     col_dt1, col_dt2 = st.columns(2)
     with col_dt1: dt_inicio = st.date_input("Data de Início do Período", date(2025, 1, 1), format="DD/MM/YYYY")
     with col_dt2: dt_fim = st.date_input("Data de Fim do Período", date(2025, 12, 31), format="DD/MM/YYYY")
-    
     if diario_completo.empty or contas_df.empty:
         st.warning("Plano de contas ou diário sem registros para o período.")
     else:
         contas_df['codigo_estruturado'] = contas_df['codigo_estruturado'].str.strip()
         contas_sorted = contas_df.sort_values(by="codigo_estruturado").copy()
-        
         diario_completo['data_dt'] = pd.to_datetime(diario_completo['data']).dt.date
         df_anterior = diario_completo[diario_completo['data_dt'] < dt_inicio]
         df_periodo = diario_completo[(diario_completo['data_dt'] >= dt_inicio) & (diario_completo['data_dt'] <= dt_fim)]
-        
         ant_deb = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         ant_cred = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         for _, lanc in df_anterior.iterrows():
             d, c, v = str(lanc['conta_debito']), str(lanc['conta_credito']), float(lanc['valor'])
             if d in ant_deb: ant_deb[d] += v
             if c in ant_cred: ant_cred[c] += v
-            
         per_deb = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         per_cred = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         for _, lanc in df_periodo.iterrows():
             d, c, v = str(lanc['conta_debito']), str(lanc['conta_credito']), float(lanc['valor'])
             if d in per_deb: per_deb[d] += v
             if c in per_cred: per_cred[c] += v
-
         linhas_balancete = []
         for _, row in contas_sorted.iterrows():
             mascara = row['codigo_estruturado']
             nome = row['nome']
             grupo_base = row['grupo']
-            
             sa_deb = 0.0; sa_cred = 0.0; sp_deb = 0.0; sp_cred = 0.0
             for _, r_sub in contas_sorted.iterrows():
                 if r_sub['codigo_estruturado'].startswith(mascara):
                     idx = str(r_sub['codigo_reduzido'])
                     sa_deb += ant_deb[idx]; sa_cred += ant_cred[idx]
                     sp_deb += per_deb[idx]; sp_cred += per_cred[idx]
-            
             if grupo_base in ['Ativo', 'Despesa']:
                 s_anterior = sa_deb - sa_cred
                 s_atual = (sa_deb + sp_deb) - (sa_cred + sp_cred)
@@ -411,20 +365,10 @@ elif choice == "Demonstrações Contábeis":
                 s_atual = (sa_cred + sp_cred) - (sa_deb + sp_deb)
                 nat_ant = "C" if s_anterior >= 0 else "D"
                 nat_at = "C" if s_atual >= 0 else "D"
-                
-            linhas_balancete.append({
-                "Classificação / Máscara": mascara, "Descrição da Conta": nome,
-                "Saldo Anterior": f"R$ {abs(s_anterior):,.2f} {nat_ant}",
-                "Débito": sp_deb, "Crédito": sp_cred,
-                "Saldo Atual": f"R$ {abs(s_atual):,.2f} {nat_at}",
-                "_saldo_puro": s_atual, "_grupo": grupo_base
-            })
-            
+            linhas_balancete.append({"Classificação / Máscara": mascara, "Descrição da Conta": nome, "Saldo Anterior": f"R$ {abs(s_anterior):,.2f} {nat_ant}", "Débito": sp_deb, "Crédito": sp_cred, "Saldo Atual": f"R$ {abs(s_atual):,.2f} {nat_at}", "_saldo_puro": s_atual, "_grupo": grupo_base})
         df_balancete_visual = pd.DataFrame(linhas_balancete)
         tab_balancete, tab_dre, tab_balanco = st.tabs(["Balancete por Níveis", "DRE Oficial", "Balanço Patrimonial"])
-        
-        with tab_balancete:
-            st.dataframe(df_balancete_visual[["Classificação / Máscara", "Descrição da Conta", "Saldo Anterior", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True)
+        with tab_balancete: st.dataframe(df_balancete_visual[["Classificação / Máscara", "Descrição da Conta", "Saldo Anterior", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True)
         with tab_dre:
             rec_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Receita' and '.' not in l['Classificação / Máscara'])
             des_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação / Máscara'])
@@ -440,19 +384,17 @@ elif choice == "Demonstrações Contábeis":
             df_pa_pl = df_balancete_visual[df_balancete_visual['_grupo'].isin(['Passivo', 'PL'])][["Classificação / Máscara", "Descrição da Conta", "Saldo Atual"]]
             c1, c2 = st.columns(2)
             with c1: st.info("**GRUPO 1 - ATIVO**"); st.write(df_at)
-            with c2: st.info("**GRUPO 2 - PASSIVO E PATRIMÔNIO LÍQUIDO**"); st.write(df_pa_pl); st.markdown(f"*(+) Lucro Líquido Incorporado: R$ {lucro_liquido:,.2f}*")
+            with c2: st.info("**GRUPO 2 - PASSIVO E PL**"); st.write(df_pa_pl); st.markdown(f"*(+) Lucro Líquido Incorporado: R$ {lucro_liquido:,.2f}*")
 
 elif choice == "Central de Relatórios Fiscais/Gerenciais":
     st.subheader("🔍 Central Multicritério de Relatórios")
     diario_livro = run_query("diario")
-    
     if diario_livro.empty: st.warning("Sem movimentações registradas.")
     else:
         diario_livro['data_dt'] = pd.to_datetime(diario_livro['data']).dt.date
         col_dt_i, col_dt_f = st.columns(2)
         with col_dt_i: r_inicio = st.date_input("Início do Filtro", date(2025, 1, 1), format="DD/MM/YYYY")
         with col_dt_f: r_fim = st.date_input("Fim do Filtro", date(2025, 12, 31), format="DD/MM/YYYY")
-        
         df_filtrado = diario_livro[(diario_livro['data_dt'] >= r_inicio) & (diario_livro['data_dt'] <= r_fim)]
         col_f2, col_f3, col_f4 = st.columns(3)
         with col_f2:
@@ -464,20 +406,11 @@ elif choice == "Central de Relatórios Fiscais/Gerenciais":
         with col_f4:
             lista_part_f = ["Todos"] + (list(df_filtrado['participante'].dropna().unique()) if 'participante' in df_filtrado.columns else [])
             sel_part = st.selectbox("Filtrar por Cliente / Fornecedor", lista_part_f)
-            
         if sel_acum != "Todos": df_filtrado = df_filtrado[df_filtrado['acumulador'] == sel_acum]
         if sel_cfop != "Todos": df_filtrado = df_filtrado[df_filtrado['cfop'] == sel_cfop]
         if sel_part != "Todos": df_filtrado = df_filtrado[df_filtrado['participante'] == sel_part]
-        
         df_filtrado['data'] = df_filtrado['data'].apply(formatar_data_br)
-        
-        t1, t2, tab_f = st.tabs(["Livro Diário / Lançamentos do Período", "Relatório de Livros Fiscais", "Resumo da Folha por Competência"])
-        with t1:
-            st.markdown("#### Lançamentos Contábeis Detalhados")
-            st.dataframe(df_filtrado[["data", "conta_debito", "conta_credito", "valor", "historico", "origem"]], use_container_width=True)
-        with t2:
-            st.markdown("#### Relatório Unificado de Entradas, Vendas e Serviços")
-            st.dataframe(df_filtrado[df_filtrado['origem'].isin(['Fiscal', 'Imposto Nota'])], use_container_width=True)
-        with tab_f:
-            st.markdown("#### Histórico de Custos com Departamento Pessoal")
-            st.dataframe(df_filtrado[df_filtrado['origem'] == 'Folha'], use_container_width=True)
+        t1, t2, tab_f = st.tabs(["Livro Diário / Lançamentos", "Relatório de Livros Fiscais", "Resumo da Folha"])
+        with t1: st.dataframe(df_filtrado[["data", "conta_debito", "conta_credito", "valor", "historico", "origem"]], use_container_width=True)
+        with t2: st.dataframe(df_filtrado[df_filtrado['origem'].isin(['Fiscal', 'Imposto Nota'])], use_container_width=True)
+        with tab_f: st.dataframe(df_filtrado[df_filtrado['origem'] == 'Folha'], use_container_width=True)
