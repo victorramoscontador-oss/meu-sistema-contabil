@@ -18,9 +18,10 @@ supabase = get_supabase_client()
 def run_query(table_name):
     try:
         response = supabase.table(table_name).select("*").execute()
-        return pd.DataFrame(response.data) if hasattr(response, 'data') else pd.DataFrame(response)
+        if hasattr(response, 'data'):
+            return pd.DataFrame(response.data)
+        return pd.DataFrame(response)
     except Exception as e:
-        st.error(f"Erro ao ler a tabela {table_name}: {e}")
         return pd.DataFrame()
 
 def run_insert(table_name, data_dict):
@@ -80,8 +81,11 @@ st.title("📊 Mini Domínio - Sistema Contábil Particular")
 menu = ["Lançamento de Notas", "Lançamento Manual", "Folha de Pagamento", "Importação OFX (Banco)", "Demonstrações Contábeis", "Cadastros Base"]
 choice = st.sidebar.selectbox("Navegação do Sistema", menu)
 
+# Carrega os dados de forma segura no início
+contas_df = run_query("plano_contas")
+
 # ==========================================
-# ABA: CADASTROS BASE (COM EDIÇÃO E PLANO DE CONTAS)
+# ABA: CADASTROS BASE
 # ==========================================
 if choice == "Cadastros Base":
     st.header("⚙️ Cadastros Estruturais e Plano de Contas")
@@ -93,20 +97,21 @@ if choice == "Cadastros Base":
             nome = st.text_input("Razão Social / Nome")
             doc = st.text_input("CPF / CNPJ")
             tipo = st.selectbox("Tipo", ["Fornecedor", "Cliente"])
-            contas_df = run_query("plano_contas")
-            lista_contas = ["Padrão do Acumulador"] + [f"{row['codigo_reduzido']} - {row['nome']}" for _, row in contas_df.iterrows()] if not contas_df.empty else ["Padrão do Acumulador"]
+            
+            lista_contas = ["Padrão do Acumulador"]
+            if not contas_df.empty:
+                lista_contas += [f"{row['codigo_reduzido']} - {row['nome']}" for _, row in contas_df.iterrows()]
             conta_part = st.selectbox("Conta Contábil Específica (Opcional)", lista_contas)
+            
             if st.form_submit_button("Salvar Novo Participante"):
                 c_reduzido = conta_part.split(" - ")[0] if conta_part != "Padrão do Acumulador" else None
                 if run_insert("participantes", {"nome": nome, "documento": doc, "tipo": tipo, "conta_contabil": c_reduzido}):
-                    st.success("Cadastrado!")
+                    st.success("Cadastrado com sucesso!")
                     st.rerun()
         
         st.write("---")
-        st.subheader("Lista de Clientes e Fornecedores Cadastrados")
         part_df = run_query("participantes")
-        if not part_df.empty:
-            st.dataframe(part_df, use_container_width=True)
+        if not part_df.empty: st.dataframe(part_df, use_container_width=True)
             
     with tab2:
         st.subheader("Gerenciar Históricos Padrão")
@@ -115,14 +120,12 @@ if choice == "Cadastros Base":
             desc_h = st.text_input("Texto do Histórico (Ex: Vlr ref nf)")
             if st.form_submit_button("Salvar Novo Histórico"):
                 if run_insert("historicos", {"codigo": cod_h, "descricao": desc_h}):
-                    st.success("Salvo!")
+                    st.success("Histórico Salvo!")
                     st.rerun()
         
         st.write("---")
-        st.subheader("Históricos Registrados")
         hist_df = run_query("historicos")
-        if not hist_df.empty:
-            st.dataframe(hist_df, use_container_width=True)
+        if not hist_df.empty: st.dataframe(hist_df, use_container_width=True)
 
     with tab3:
         st.subheader("Gerenciar Acumuladores")
@@ -130,12 +133,17 @@ if choice == "Cadastros Base":
             cod_a = st.text_input("Código do Acumulador")
             desc_a = st.text_input("Descrição da Operação")
             op_a = st.selectbox("Tipo de Movimento", ["Entrada", "Saída", "Serviço Prestado"])
-            contas_com_dinamico = ["FORNECEDOR", "CLIENTE"] + [f"{row['codigo_reduzido']} - {row['nome']}" for _, row in contas_df.iterrows()] if not contas_df.empty else ["FORNECEDOR", "CLIENTE"]
+            
+            contas_com_dinamico = ["FORNECEDOR", "CLIENTE"]
+            if not contas_df.empty:
+                contas_com_dinamico += [f"{row['codigo_reduzido']} - {row['nome']}" for _, row in contas_df.iterrows()]
+            
             c_deb = st.selectbox("Conta Débito", contas_com_dinamico)
             c_cred = st.selectbox("Conta Crédito", contas_com_dinamico)
+            
             hist_df = run_query("historicos")
             lista_hist = [f"{row['codigo']} - {row['descricao']}" for _, row in hist_df.iterrows()] if not hist_df.empty else []
-            h_padrao = st.selectbox("Histórico Padrão Base", lista_hist) if lista_hist else st.text_input("Código do Histórico Manual")
+            h_padrao = st.selectbox("Histórico Padrão Base", lista_hist) if lista_hist else st.text_input("Código do Histórico Manual (Ex: 100)")
             aliq = st.number_input("Alíquota de Imposto (%)", min_value=0.0, max_value=100.0, step=0.1)
             
             if st.form_submit_button("Salvar Novo Acumulador"):
@@ -147,10 +155,8 @@ if choice == "Cadastros Base":
                     st.rerun()
         
         st.write("---")
-        st.subheader("Acumuladores Configurados")
         acum_df = run_query("acumuladores")
-        if not acum_df.empty:
-            st.dataframe(acum_df, use_container_width=True)
+        if not acum_df.empty: st.dataframe(acum_df, use_container_width=True)
 
     with tab4:
         st.subheader("Gestão do Plano de Contas")
@@ -170,23 +176,24 @@ if choice == "Cadastros Base":
             st.markdown("**Editar Conta Existente**")
             if not contas_df.empty:
                 dict_edit_contas = {f"{row['codigo_reduzido']} - {row['nome']}": row for _, row in contas_df.iterrows()}
-                conta_para_editar = st.selectbox("Selecione a Conta para Modificar", list(dict_edit_contas.keys()))
+                conta_para_editar = st.selectbox("Selecione a Conta", list(dict_edit_contas.keys()))
                 dados_originais = dict_edit_contas[conta_para_editar]
                 
                 with st.form("edit_account_form"):
-                    ed_nome = st.text_input("Novo Nome da Conta", value=dados_originais['nome'])
-                    ed_est = st.text_input("Novo Código Estruturado", value=dados_originais['codigo_estruturado'])
+                    ed_nome = st.text_input("Novo Nome", value=dados_originais['nome'])
+                    ed_est = st.text_input("Novo Estruturado", value=dados_originais['codigo_estruturado'])
                     ed_grp = st.selectbox("Novo Grupo", ["Ativo", "Passivo", "PL", "Receita", "Despesa"], index=["Ativo", "Passivo", "PL", "Receita", "Despesa"].index(dados_originais['grupo']))
                     if st.form_submit_button("Salvar Alterações"):
                         if run_update("plano_contas", "codigo_reduzido", dados_originais['codigo_reduzido'], {"nome": ed_nome, "codigo_estruturado": ed_est, "grupo": ed_grp}):
-                            st.success("Conta Contábil atualizada com sucesso!")
+                            st.success("Conta atualizada!")
                             st.rerun()
+            else:
+                st.info("Nenhuma conta para editar ainda.")
         st.write("---")
-        st.subheader("Plano de Contas Atual")
-        st.dataframe(contas_df.sort_values(by="codigo_estruturado"), use_container_width=True)
+        if not contas_df.empty: st.dataframe(contas_df.sort_values(by="codigo_estruturado"), use_container_width=True)
 
 # ==========================================
-# ABA: LANÇAMENTO DE NOTAS (FISCAL AUTOMÁTICO)
+# ABA: LANÇAMENTO DE NOTAS
 # ==========================================
 elif choice == "Lançamento de Notas":
     st.header("🧾 Escrituração Fiscal Dinâmica (Padrão Domínio)")
@@ -194,10 +201,11 @@ elif choice == "Lançamento de Notas":
     acum_df = run_query("acumuladores")
     
     if part_df.empty or acum_df.empty:
-        st.warning("Acesse a aba 'Cadastros Base' e cadastre pelo menos um participante e um acumulador.")
+        st.warning("Vá até o menu 'Cadastros Base' (última opção do menu) e registre pelo menos um Participante e um Acumulador para liberar esta tela.")
     else:
         with st.form("form_nota"):
             col1, col2 = st.columns(2)
             with col1:
                 data_nf = st.date_input("Data da Nota", datetime.now())
                 num_nf = st.text_input("Número do Documento / NF")
+                dict_part = {row['id']: (row['nome'], row['conta_contabil']) for _, row in part_df.iterrows()}
