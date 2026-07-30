@@ -37,6 +37,13 @@ def run_update(table_name, match_col, match_val, update_dict):
 def criar_hash(senha):
     return hashlib.sha256(str.encode(senha)).hexdigest()
 
+def formatar_data_br(data_str):
+    try:
+        dt = datetime.strptime(data_str, "%Y-%m-%d")
+        return dt.strftime("%d/%m/%Y")
+    except:
+        return data_str
+
 # 2. CONTROLE DE ACESSO (LOGIN)
 USUARIO_MASTER = "contador"
 SENHA_HASH_MASTER = criar_hash("admin123") 
@@ -144,14 +151,14 @@ if choice == "Cadastros Base":
                     e_grp = st.selectbox("Novo Grupo", ["Ativo", "Passivo", "PL", "Receita", "Despesa"], index=["Ativo", "Passivo", "PL", "Receita", "Despesa"].index(d_orig['grupo']))
                     if st.form_submit_button("Salvar Alterações"):
                         if run_update("plano_contas", "codigo_reduzido", d_orig['codigo_reduzido'], {"nome": e_nome, "codigo_estruturado": e_est, "grupo": e_grp}):
-                            st.success("Conta atualizada!"); st.rerun()
+                            st.success("Conta updated!"); st.rerun()
         if not contas_df.empty: st.dataframe(contas_df.sort_values(by="codigo_estruturado"), use_container_width=True)
 elif choice == "Lançamento de Notas":
     st.header("🧾 Escrituração Fiscal Dinâmica (Padrão Domínio)")
     with st.form("form_nota"):
         col1, col2 = st.columns(2)
         with col1:
-            data_nf = st.date_input("Data da Nota", datetime.now())
+            data_nf = st.date_input("Data da Nota", datetime.now(), format="DD/MM/YYYY")
             num_nf = st.text_input("Número do Documento / NF")
             lista_p = ["Padrão Sem Cadastro"]
             if not part_df.empty:
@@ -191,7 +198,7 @@ elif choice == "Lançamento de Notas":
 elif choice == "Lançamento Manual":
     st.header("✍️ Lançamento Contábil Manual (Partida Dobrada)")
     with st.form("manual_entry_form"):
-        m_data = st.date_input("Data do Lançamento", datetime.now())
+        m_data = st.date_input("Data do Lançamento", datetime.now(), format="DD/MM/YYYY")
         lista_contas_m = ["Nenhuma conta cadastrada"]
         if not contas_df.empty:
             lista_contas_m = [f"{row['codigo_reduzido']} - {row['nome']}" for _, row in contas_df.iterrows()]
@@ -209,7 +216,7 @@ elif choice == "Lançamento Manual":
 elif choice == "Folha de Pagamento":
     st.header("👥 Módulo de Folha Simplificado")
     with st.form("form_folha"):
-        data_folha = st.date_input("Competência da Folha", datetime.now())
+        data_folha = st.date_input("Competência da Folha", datetime.now(), format="DD/MM/YYYY")
         salario_bruto = st.number_input("Valor Total dos Salários Brutos (R$)", min_value=0.0, step=100.0)
         inss_retido = st.number_input("Valor Total do INSS Retido (R$)", min_value=0.0, step=10.0)
         if st.form_submit_button("Fechar Folha e Integrar"):
@@ -238,6 +245,7 @@ elif choice == "Importação OFX (Banco)":
                 memo_txt = memo.group(1) if memo else "BANCO"
                 dados_ofx.append({"Data": str(datetime.now().date()), "Histórico OFX": memo_txt, "Valor": abs(val_num), "Tipo": "Crédito" if val_num > 0 else "Débito"})
             df_ofx = pd.DataFrame(dados_ofx)
+            df_ofx['Data'] = df_ofx['Data'].apply(formatar_data_br)
             st.dataframe(df_ofx, use_container_width=True)
             if st.button("Processar Lançamentos do OFX"):
                 sucessos = 0
@@ -247,7 +255,9 @@ elif choice == "Importação OFX (Banco)":
                         if termo in hist_banco:
                             deb_f = c_deb if linha['Tipo'] == "Débito" else "2"
                             cred_f = c_cred if linha['Tipo'] == "Débito" else c_deb
-                            run_insert("diario", {"data": linha['Data'], "conta_debito": deb_f, "conta_credito": cred_f, "valor": linha['Valor'], "historico": f"OFX: {linha['Histórico OFX']}", "origem": "OFX"})
+                            # Converte de volta para salvar no banco padrão AAAA-MM-DD
+                            dt_banco = datetime.strptime(linha['Data'], "%d/%m/%Y").strftime("%Y-%m-%d")
+                            run_insert("diario", {"data": dt_banco, "conta_debito": deb_f, "conta_credito": cred_f, "valor": linha['Valor'], "historico": f"OFX: {linha['Histórico OFX']}", "origem": "OFX"})
                             sucessos += 1; break
                 st.success(f"Conciliação concluída! {sucessos} lançamentos gerados.")
 elif choice == "Demonstrações Contábeis":
@@ -255,8 +265,8 @@ elif choice == "Demonstrações Contábeis":
     diario_completo = run_query("diario")
     
     col_dt1, col_dt2 = st.columns(2)
-    with col_dt1: dt_inicio = st.date_input("Data de Início do Período", date(2025, 1, 1))
-    with col_dt2: dt_fim = st.date_input("Data de Fim do Período", date(2025, 12, 31))
+    with col_dt1: dt_inicio = st.date_input("Data de Início do Período", date(2025, 1, 1), format="DD/MM/YYYY")
+    with col_dt2: dt_fim = st.date_input("Data de Fim do Período", date(2025, 12, 31), format="DD/MM/YYYY")
     
     if diario_completo.empty or contas_df.empty:
         st.warning("Cadastre as contas e faça lançamentos para visualizar os relatórios.")
@@ -264,12 +274,10 @@ elif choice == "Demonstrações Contábeis":
         contas_df['codigo_estruturado'] = contas_df['codigo_estruturado'].str.strip()
         contas_sorted = contas_df.sort_values(by="codigo_estruturado").copy()
         
-        # Filtros temporais baseados no Diário
         diario_completo['data_dt'] = pd.to_datetime(diario_completo['data']).dt.date
         df_anterior = diario_completo[diario_completo['data_dt'] < dt_inicio]
         df_periodo = diario_completo[(diario_completo['data_dt'] >= dt_inicio) & (diario_completo['data_dt'] <= dt_fim)]
         
-        # 1. PROCESSAMENTO DE SALDO ANTERIOR DINÂMICO
         ant_deb = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         ant_cred = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         for _, lanc in df_anterior.iterrows():
@@ -277,7 +285,6 @@ elif choice == "Demonstrações Contábeis":
             if d in ant_deb: ant_deb[d] += v
             if c in ant_cred: ant_cred[c] += v
             
-        # 2. PROCESSAMENTO DO PERÍODO SELECIONADO
         per_deb = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         per_cred = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         for _, lanc in df_periodo.iterrows():
@@ -291,7 +298,6 @@ elif choice == "Demonstrações Contábeis":
             nome = row['nome']
             grupo_base = row['grupo']
             
-            # Cálculo cascata de Níveis (Sintéticas acumulando as Analíticas)
             sa_deb = 0.0; sa_cred = 0.0; sp_deb = 0.0; sp_cred = 0.0
             for _, r_sub in contas_sorted.iterrows():
                 if r_sub['codigo_estruturado'].startswith(mascara):
@@ -299,7 +305,6 @@ elif choice == "Demonstrações Contábeis":
                     sa_deb += ant_deb[idx]; sa_cred += ant_cred[idx]
                     sp_deb += per_deb[idx]; sp_cred += per_cred[idx]
             
-            # Lógica Contábil de Natureza de Saldos (Igual ao modelo Hardman)
             if grupo_base in ['Ativo', 'Despesa']:
                 s_anterior = sa_deb - sa_cred
                 s_atual = (sa_deb + sp_deb) - (sa_cred + sp_cred)
@@ -348,9 +353,9 @@ elif choice == "Central de Relatórios Fiscais/Gerenciais":
     if diario_livro.empty: st.warning("Sem movimentações registradas.")
     else:
         diario_livro['data_dt'] = pd.to_datetime(diario_livro['data']).dt.date
-        col_f1, col_dt_i, col_dt_f = st.columns(3)
-        with col_dt_i: r_inicio = st.date_input("Início do Filtro", date(2025, 1, 1))
-        with col_dt_f: r_fim = st.date_input("Fim do Filtro", date(2025, 12, 31))
+        col_dt_i, col_dt_f = st.columns(2)
+        with col_dt_i: r_inicio = st.date_input("Início do Filtro", date(2025, 1, 1), format="DD/MM/YYYY")
+        with col_dt_f: r_fim = st.date_input("Fim do Filtro", date(2025, 12, 31), format="DD/MM/YYYY")
         
         df_filtrado = diario_livro[(diario_livro['data_dt'] >= r_inicio) & (diario_livro['data_dt'] <= r_fim)]
         
@@ -368,6 +373,8 @@ elif choice == "Central de Relatórios Fiscais/Gerenciais":
         if sel_acum != "Todos": df_filtrado = df_filtrado[df_filtrado['acumulador'] == sel_acum]
         if sel_cfop != "Todos": df_filtrado = df_filtrado[df_filtrado['cfop'] == sel_cfop]
         if sel_part != "Todos": df_filtrado = df_filtrado[df_filtrado['participante'] == sel_part]
+        
+        df_filtrado['data'] = df_filtrado['data'].apply(formatar_data_br)
         
         t1, t2, tab_f = st.tabs(["Livro Diário / Lançamentos do Período", "Relatório de Livros Fiscais", "Resumo da Folha por Competência"])
         with t1:
