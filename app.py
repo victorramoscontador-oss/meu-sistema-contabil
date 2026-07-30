@@ -1,17 +1,17 @@
 import streamlit as st
 import pandas as pd
-from supabase import create_client, Client
+from supabase import create_client
 from datetime import datetime, date
 import hashlib
 import re
 
 st.set_page_config(page_title="Fluxo Assessoria Financeira", layout="wide")
 
+# Marca e Identidade Visual Otimizada (Verde e Branco)
 st.markdown("""
     <style>
-        @import url('https://googleapis.com');
         html, body, [data-testid="stAppViewContainer"], .stWidgetLabel, p, div {
-            font-family: 'Roboto', sans-serif !important; background-color: #FAFAFA !important; color: #1E293B !important;
+            font-family: 'Segoe UI', sans-serif !important; background-color: #FAFAFA !important; color: #1E293B !important;
         }
         section[data-testid="stSidebar"] { background-color: #031F11 !important; border-right: 1px solid #0C2E19 !important; }
         section[data-testid="stSidebar"] * { color: #F1F5F9 !important; }
@@ -21,11 +21,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-SUPABASE_URL = "https://supabase.co"
-SUPABASE_KEY = "sb_publishable_4OAD9stwBHF-L-eMaZkrFg_wRGMplWa"
+# Coleta das chaves exatamente com o nome que está na sua caixa preta do Streamlit
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
 @st.cache_resource
-def get_supabase_client() -> Client:
+def get_supabase_client():
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 supabase = get_supabase_client()
@@ -43,7 +44,7 @@ def run_insert(table_name, data_dict):
 if 'auth' not in st.session_state: st.session_state['auth'] = False
 
 if not st.session_state['auth']:
-    st.markdown("<div style='text-align:center;'><h2>>> <<</h2><h1>FLUXO</h1><p>Assessoria Financeira</p></div>", unsafe_allow_html=True)
+    st.markdown("<div style='text-align:center;'><h2>&gt;&gt; &lt;&lt;</h2><h1>FLUXO</h1><p>Assessoria Financeira</p></div>", unsafe_allow_html=True)
     u = st.text_input("Usuário")
     p = st.text_input("Senha", type="password")
     if st.button("Acessar Painel"):
@@ -106,7 +107,7 @@ elif choice == "Lançamento de Notas":
         ac = st.selectbox("Acumulador", acum_df['codigo'].tolist() if not acum_df.empty else ["Sem cadastros"])
         v = st.number_input("Valor", min_value=0.0)
         if st.form_submit_button("Processar Nota"):
-            cfg = acum_df[acum_df['codigo'] == ac].iloc[0] if not acum_df.empty else {}
+            cfg = acum_df[acum_df['codigo'] == ac].iloc if not acum_df.empty else {}
             run_insert("diario", {"data": str(dt), "conta_debito": str(cfg.get('conta_debito','4')), "conta_credito": str(cfg.get('conta_credito','3')), "valor": v, "historico": f"Vr ref NF {num}, Part: {pt}", "origem": "Fiscal", "acumulador": str(ac), "cfop": str(cfg.get('cfop','')), "participante": str(pt)})
             st.success("Escriturado!"); st.rerun()
 
@@ -157,16 +158,12 @@ elif choice == "Demonstrações Contábeis":
         linhas = []
         for _, row in contas_df.sort_values(by="codigo_estruturado").iterrows():
             m, n, g, r_c = row['codigo_estruturado'], row['nome'], row['grupo'], str(row['codigo_reduzido'])
-            
-            # Cálculo veloz e otimizado sem loops aninhados
             ant_d = df_ant[df_ant['conta_debito'] == r_c]['valor'].sum()
             ant_c = df_ant[df_ant['conta_credito'] == r_c]['valor'].sum()
             per_d = df_per[df_per['conta_debito'] == r_c]['valor'].sum()
             per_c = df_per[df_per['conta_credito'] == r_c]['valor'].sum()
-            
             s_ant = (ant_d - ant_c) if g in ['Ativo', 'Despesa'] else (ant_c - ant_d)
             s_at = ((ant_d + per_d) - (ant_c + per_c)) if g in ['Ativo', 'Despesa'] else ((ant_c + per_c) - (ant_d + per_d))
-            
             linhas.append({"Classificação": m, "Descrição": n, "Saldo Anterior": f"R$ {s_ant:,.2f}", "Débito": per_d, "Crédito": per_c, "Saldo Atual": f"R$ {s_at:,.2f}", "_val": s_at, "_grp": g})
         
         df_v = pd.DataFrame(linhas)
@@ -186,6 +183,6 @@ elif choice == "Central de Relatórios":
     diario = run_query("diario")
     if diario.empty: st.info("Vazio.")
     else:
-        ac_f = st.text_input("Filtrar por Acumulador (Deixe em branco para todos)")
+        ac_f = st.text_input("Filtrar por Acumulador")
         if ac_f: diario = diario[diario['acumulador'] == ac_f]
         st.dataframe(diario[["data", "conta_debito", "conta_credito", "valor", "historico", "origem"]], use_container_width=True)
