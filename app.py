@@ -5,30 +5,108 @@ from datetime import datetime, date
 import hashlib
 import re
 
-# ==========================================
-# CUSTOMIZAÇÃO VISUAL: FLUXO ASSESSORIA FINANCEIRA
-# ==========================================
-st.set_page_config(page_title="Fluxo Assessoria Financeira - Sistema Contábil", layout="wide")
+# =========================================================================
+# CONFIGURAÇÃO E IDENTIDADE VISUAL - FLUXO ASSESSORIA FINANCEIRA
+# =========================================================================
+st.set_page_config(page_title="Fluxo Assessoria Financeira", layout="wide", initial_sidebar_state="expanded")
 
-# Injeção de estilo CSS para forçar as cores Verde e Branco da sua marca
+# Injeção de Estilo Avançado CSS Professional UX/UI com Tipografia Corporativa
 st.markdown("""
     <style>
-        /* Cor de fundo principal e textos */
-        .stApp { background-color: #FFFFFF; color: #1E293B; }
-        /* Barra lateral (Sidebar) em tom verde escuro elegante */
-        section[data-testid="stSidebar"] { background-color: #064E3B !important; }
-        section[data-testid="stSidebar"] * { color: #FFFFFF !important; }
-        /* Botões em Verde institucional */
-        div.stButton > button:first-child {
-            background-color: #10B981 !important; color: white !important;
-            border-radius: 6px !important; border: none !important;
+        @import url('https://googleapis.com');
+        
+        /* Reset de Tipografia Global - Padrão de Sistemas Operacionais Avançados */
+        html, body, [data-testid="stAppViewContainer"], .stWidgetLabel, p, div {
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+            background-color: #FAFAFA !important;
+            color: #1E293B !important;
+            letter-spacing: -0.1px !important;
         }
-        div.stButton > button:first-child:hover { background-color: #059669 !important; }
-        /* Abas e Menus selecionados */
-        button[data-baseweb="tab"] { color: #475569 !important; }
-        button[aria-selected="true"] { color: #10B981 !important; border-bottom-color: #10B981 !important; }
-        /* Mensagens de sucesso */
-        .stAlert { background-color: #E6F4EA !important; color: #137333 !important; }
+        
+        /* Menu Lateral (Sidebar) Executivo */
+        section[data-testid="stSidebar"] {
+            background-color: #031F11 !important; /* Verde Corporativo Profundo */
+            border-right: 1px solid #0C2E19 !important;
+        }
+        section[data-testid="stSidebar"] * {
+            color: #F1F5F9 !important;
+            font-size: 14px !important;
+            font-family: 'Roboto', sans-serif !important;
+        }
+        section[data-testid="stSidebar"] .stSelectbox label {
+            color: #94A3B8 !important;
+            font-weight: 500 !important;
+            text-transform: uppercase !important;
+            font-size: 11px !important;
+            letter-spacing: 0.5px !important;
+        }
+        
+        /* Títulos Marcantes e Profissionais */
+        h1, h2, h3, [data-testid="stHeader"] {
+            font-family: 'Roboto', -apple-system, sans-serif !important;
+            font-weight: 700 !important;
+            color: #031F11 !important;
+            letter-spacing: -0.5px !important;
+        }
+        
+        /* Cards de Conteúdo Limpos e Flutuantes */
+        div[data-testid="stForm"], div[data-testid="element-container"] > div.stAlert {
+            background-color: #FFFFFF !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 8px !important;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+            padding: 28px !important;
+        }
+        
+        /* Customização dos Inputs (Campos de Preenchimento) */
+        input, select, textarea {
+            background-color: #FFFFFF !important;
+            border: 1px solid #CBD5E1 !important;
+            border-radius: 6px !important;
+            color: #0F172A !important;
+            padding: 12px !important;
+            font-size: 14px !important;
+        }
+        
+        /* Botões de Alta Performance */
+        div.stButton > button {
+            background: #031F11 !important;
+            color: #FFFFFF !important;
+            font-weight: 500 !important;
+            text-transform: uppercase !important;
+            font-size: 13px !important;
+            letter-spacing: 0.8px !important;
+            padding: 12px 30px !important;
+            border-radius: 6px !important;
+            border: 1px solid #031F11 !important;
+            transition: all 0.15s ease-in-out !important;
+            width: 100% !important;
+        }
+        div.stButton > button:hover {
+            background: #10B981 !important;
+            border-color: #10B981 !important;
+            color: #FFFFFF !important;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2) !important;
+        }
+        
+        /* Tabelas e Balancetes Contábeis de Alta Resolução */
+        div[data-testid="stDataFrame"] table {
+            border-collapse: collapse !important;
+        }
+        div[data-testid="stDataFrame"] th {
+            background-color: #F8FAFC !important;
+            color: #475569 !important;
+            font-weight: 700 !important;
+            text-transform: uppercase !important;
+            font-size: 12px !important;
+            letter-spacing: 0.3px !important;
+            border-bottom: 2px solid #E2E8F0 !important;
+        }
+        div[data-testid="stDataFrame"] td {
+            font-size: 14px !important;
+            font-variant-numeric: tabular-nums !important;
+            border-bottom: 1px solid #E2E8F0 !important;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -70,7 +148,7 @@ def formatar_data_br(data_str):
         return dt.strftime("%d/%m/%Y")
     except: return data_str
 
-# 2. CONTROLE DE ACESSO (LOGIN)
+# 2. CONTROLE DE ACESSO (LOGIN EDITADO)
 USUARIO_MASTER = "contador"
 SENHA_HASH_MASTER = criar_hash("admin123") 
 
@@ -78,41 +156,49 @@ if 'autenticado' not in st.session_state:
     st.session_state['autenticado'] = False
 
 def tela_login():
-    st.markdown("<h3 style='text-align: center; color: #064E3B;'>🔒 Fluxo Assessoria Financeira<br><span style='font-size:16px; color:#475569;'>Acesso ao Painel Particular</span></h3>", unsafe_allow_html=True)
+    st.markdown("""
+        <div style='text-align: center; margin-bottom: 25px;'>
+            <h2 style='color: #031F11; margin: 0; font-size: 26px; font-weight:700; letter-spacing:-0.5px;'>FLUXO</h2>
+            <p style='color: #64748B; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin-top: 4px; font-weight: 500;'>Assessoria Financeira</p>
+        </div>
+    """, unsafe_allow_html=True)
     with st.form("login_form"):
-        user = st.text_input("Usuário", placeholder="Digite seu usuário")
-        password = st.text_input("Senha", type="password", placeholder="Digite sua senha")
-        if st.form_submit_button("Entrar no Sistema"):
+        user = st.text_input("Usuário", placeholder="Código de acesso")
+        password = st.text_input("Senha", type="password", placeholder="••••••••")
+        if st.form_submit_button("Autenticar Usuário"):
             if user == USUARIO_MASTER and criar_hash(password) == SENHA_HASH_MASTER:
                 st.session_state['autenticado'] = True
                 st.rerun()
-            else: st.error("Usuário ou senha incorretos.")
+            else: st.error("Acesso negado. Credenciais inválidas.")
 
 if not st.session_state['autenticado']:
-    tela_login(); st.stop()
+    col_l, col_c, col_r = st.columns([1, 1.1, 1])
+    with col_c: tela_login()
+    st.stop()
 
-# 3. INTERFACE E MENUS DA FLUXO
-if st.sidebar.button("🚪 Sair do Sistema"):
+# 3. INTERFACE INTEGRADA E LOGOTIPO CORPORATIVO
+st.sidebar.markdown("""
+    <div style='text-align: center; padding: 20px 0; border-bottom: 1px solid #0C2E19; margin-bottom: 25px;'>
+        <h3 style='color: #FFFFFF; margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.5px;'>FLUXO ASSESSORIA</h3>
+        <span style='color: #10B981; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;'>Sistema de Controle Particular</span>
+    </div>
+""", unsafe_allow_html=True)
+
+if st.sidebar.button("🚪 Enerrar Sessão Segura"):
     st.session_state['autenticado'] = False
     st.rerun()
 
-# Espaço reservado para carregar sua imagem da logo na barra lateral se você quiser arrastá-la no futuro
-st.sidebar.markdown("<h2 style='text-align: center; color: white; font-size: 20px;'>📈 FLUXO</h2>", unsafe_allow_html=True)
-
-st.title("💼 Fluxo Assessoria Financeira - Gestão Contábil Particular")
-menu = ["Lançamento de Notas", "Lançamento Manual", "Folha de Pagamento", "Importação OFX (Banco)", "Demonstrações Contábeis", "Central de Relatórios Fiscais/Gerenciais", "Cadastros Base"]
-choice = st.sidebar.selectbox("Navegação do Sistema", menu)
+choice = st.sidebar.selectbox("Navegação do Sistema", ["Lançamento de Notas", "Lançamento Manual", "Folha de Pagamento", "Importação OFX (Banco)", "Demonstrações Contábeis", "Central de Relatórios Fiscais/Gerenciais", "Cadastros Base"])
 
 contas_df = run_query("plano_contas")
 part_df = run_query("participantes")
 acum_df = run_query("acumuladores")
 hist_df = run_query("historicos")
-
 if choice == "Cadastros Base":
-    st.header("⚙️ Cadastros Estruturais e Plano de Contas")
+    st.subheader("⚙️ Cadastros Estruturais e Plano de Contas")
     tab1, tab2, tab3, tab4 = st.tabs(["Clientes/Fornecedores", "Históricos Padrão", "Acumuladores", "Plano de Contas"])
     with tab1:
-        st.subheader("Gerenciar Participantes")
+        st.markdown("#### Gerenciar Participantes")
         with st.form("form_p"):
             nome = st.text_input("Razão Social / Nome")
             doc = st.text_input("CPF / CNPJ")
@@ -123,24 +209,24 @@ if choice == "Cadastros Base":
             if st.form_submit_button("Salvar Novo Participante"):
                 c_red = conta_p.split(" - ") if conta_p != "Padrão do Acumulador" else None
                 if run_insert("participantes", {"nome": nome, "documento": doc, "tipo": tipo, "conta_contabil": c_red}):
-                    st.success("Cadastrado!"); st.rerun()
+                    st.success("Participante adicionado à nuvem!"); st.rerun()
         if not part_df.empty: st.dataframe(part_df, use_container_width=True)
     with tab2:
-        st.subheader("Gerenciar Históricos Padrão")
+        st.markdown("#### Gerenciar Históricos Padrão")
         with st.form("form_h"):
             cod_h = st.text_input("Código Histórico")
             desc_h = st.text_input("Texto do Histórico")
             if st.form_submit_button("Salvar Novo Histórico"):
                 if run_insert("historicos", {"codigo": cod_h, "descricao": desc_h}):
-                    st.success("Salvo!"); st.rerun()
+                    st.success("Histórico salvo com sucesso!"); st.rerun()
         if not hist_df.empty: st.dataframe(hist_df, use_container_width=True)
     with tab3:
-        st.subheader("Gerenciar Acumuladores")
+        st.markdown("#### Gerenciar Acumuladores")
         with st.form("form_a"):
             cod_a = st.text_input("Código do Acumulador")
             desc_a = st.text_input("Descrição da Operação")
             op_a = st.selectbox("Tipo de Movimento", ["Entrada", "Saída", "Serviço Prestado"])
-            cfop_a = st.text_input("CFOP Associado (Ex: 5102, 1102)")
+            cfop_a = st.text_input("CFOP Associado")
             c_dinamico = ["FORNECEDOR", "CLIENTE"]
             if not contas_df.empty: c_dinamico += [f"{r['codigo_reduzido']} - {r['nome']}" for _, r in contas_df.iterrows()]
             c_deb = st.selectbox("Conta Débito", c_dinamico)
@@ -149,23 +235,25 @@ if choice == "Cadastros Base":
             h_pad = st.selectbox("Histórico Padrão Base", l_hist) if l_hist else st.text_input("Histórico Manual")
             aliq = st.number_input("Alíquota (%)", min_value=0.0, max_value=100.0, step=0.1)
             if st.form_submit_button("Salvar Novo Acumulador"):
-                d_c = c_deb.split(" - "); c_c = c_cred.split(" - "); h_c = h_pad.split(" - ")
+                d_c = c_deb.split(" - ") if " - " in c_deb else c_deb
+                c_c = c_cred.split(" - ") if " - " in c_cred else c_cred
+                h_c = h_pad.split(" - ") if " - " in h_pad else h_pad
                 if run_insert("acumuladores", {"codigo": cod_a, "descricao": desc_a, "operacao": op_a, "conta_debito": d_c, "conta_credito": c_c, "historico_padrao": h_c, "aliquota_imposto": aliq/100, "cfop": cfop_a}):
-                    st.success("Acumulador Cadastrado!"); st.rerun()
+                    st.success("Acumulador configurado!"); st.rerun()
         if not acum_df.empty: st.dataframe(acum_df, use_container_width=True)
     with tab4:
-        st.subheader("Gestão do Plano de Contas")
+        st.markdown("#### Gestão Estruturada do Plano de Contas")
         col_c1, col_c2 = st.columns(2)
         with col_c1:
             st.markdown("**Adicionar Nova Conta**")
             with st.form("new_acc"):
                 n_red = st.text_input("Código Reduzido")
-                n_est = st.text_input("Classificação / Máscara")
+                n_est = st.text_input("Classificação / Máscara (Ex: 1.1.1.01.0001)")
                 n_nome = st.text_input("Nome da Conta")
                 n_grp = st.selectbox("Grupo Contábil", ["Ativo", "Passivo", "PL", "Receita", "Despesa"])
                 if st.form_submit_button("Adicionar Conta"):
                     if run_insert("plano_contas", {"codigo_reduzido": n_red, "codigo_estruturado": n_est, "nome": n_nome, "grupo": n_grp}):
-                        st.success("Conta adicionada!"); st.rerun()
+                        st.success("Conta adicionada com sucesso!"); st.rerun()
         with col_c2:
             st.markdown("**Editar Conta Existente**")
             if not contas_df.empty:
@@ -178,10 +266,10 @@ if choice == "Cadastros Base":
                     e_grp = st.selectbox("Novo Grupo", ["Ativo", "Passivo", "PL", "Receita", "Despesa"], index=["Ativo", "Passivo", "PL", "Receita", "Despesa"].index(d_orig['grupo']))
                     if st.form_submit_button("Salvar Alterações"):
                         if run_update("plano_contas", "codigo_reduzido", d_orig['codigo_reduzido'], {"nome": e_nome, "codigo_estruturado": e_est, "grupo": e_grp}):
-                            st.success("Conta updated!"); st.rerun()
+                            st.success("Conta atualizada!"); st.rerun()
         if not contas_df.empty: st.dataframe(contas_df.sort_values(by="codigo_estruturado"), use_container_width=True)
 elif choice == "Lançamento de Notas":
-    st.header("🧾 Escrituração Fiscal Dinâmica (Padrão Domínio)")
+    st.subheader("🧾 Escrituração Fiscal Dinâmica (Padrão Domínio)")
     with st.form("form_nota"):
         col1, col2 = st.columns(2)
         with col1:
@@ -205,9 +293,9 @@ elif choice == "Lançamento de Notas":
             if part_df.empty or acum_df.empty:
                 st.error("Erro: Cadastre um Participante e um Acumulador antes de processar notas.")
             else:
-                id_p = int(participante_sel.split(" - "))
+                id_p = int(participante_sel.split(" - ")[0])
                 nome_p, conta_especifica_p = dict_part[id_p]
-                cod_ac = acum_sel.split(" - ")
+                cod_ac = acum_sel.split(" - ")[0]
                 config_ac = dict_acum[cod_ac]
                 c_debito, c_credito = config_ac['conta_debito'], config_ac['conta_credito']
                 cfop_associado = config_ac.get('cfop', '')
@@ -220,10 +308,10 @@ elif choice == "Lançamento de Notas":
                 imposto_calculado = valor_nf * float(config_ac['aliquota_imposto'])
                 if imposto_calculado > 0:
                     run_insert("diario", {"data": str(data_nf), "conta_debito": "11", "conta_credito": "6", "valor": imposto_calculado, "historico": f"Provisão Imposto ref NF {num_nf}", "origem": "Imposto Nota", "acumulador": str(cod_ac), "cfop": str(cfop_associado), "participante": str(nome_p)})
-                st.success("Lançamento automático enviado ao diário!")
+                st.success("Lançamento automatizado integrado com sucesso!")
 
 elif choice == "Lançamento Manual":
-    st.header("✍️ Lançamento Contábil Manual (Partida Dobrada)")
+    st.subheader("✍️ Lançamento Contábil Manual (Partida Dobrada)")
     with st.form("manual_entry_form"):
         m_data = st.date_input("Data do Lançamento", datetime.now(), format="DD/MM/YYYY")
         lista_contas_m = ["Nenhuma conta cadastrada"]
@@ -236,12 +324,12 @@ elif choice == "Lançamento Manual":
         if st.form_submit_button("Gravar Lançamento Manual"):
             if contas_df.empty: st.error("Erro: Cadastre as contas contábeis primeiro.")
             else:
-                c_d_red = m_deb.split(" - "); c_c_red = m_cred.split(" - ")
+                c_d_red = m_deb.split(" - ")[0]; c_c_red = m_cred.split(" - ")[0]
                 if run_insert("diario", {"data": str(m_data), "conta_debito": c_d_red, "conta_credito": c_c_red, "valor": m_val, "historico": m_hist, "origem": "Manual"}):
-                    st.success("Gravado com sucesso no Diário!")
+                    st.success("Lançamento Manual consolidado no Diário!")
 
 elif choice == "Folha de Pagamento":
-    st.header("👥 Módulo de Folha Simplificado")
+    st.subheader("👥 Módulo de Folha Simplificado")
     with st.form("form_folha"):
         data_folha = st.date_input("Competência da Folha", datetime.now(), format="DD/MM/YYYY")
         salario_bruto = st.number_input("Valor Total dos Salários Brutos (R$)", min_value=0.0, step=100.0)
@@ -251,12 +339,12 @@ elif choice == "Folha de Pagamento":
             run_insert("diario", {"data": data_str, "conta_debito": "10", "conta_credito": "5", "valor": salario_bruto, "historico": f"Faturamento folha competência {data_str[:7]}", "origem": "Folha"})
             if inss_retido > 0:
                 run_insert("diario", {"data": data_str, "conta_debito": "5", "conta_credito": "6", "valor": inss_retido, "historico": f"Retenção INSS competência {data_str[:7]}", "origem": "Folha"})
-            st.success("Folha integrada com sucesso!")
+            st.success("Módulo de Folha fechado e integrado permanentemente!")
 
 elif choice == "Importação OFX (Banco)":
-    st.header("🏦 Importador Real de Extratos Bancários (.OFX)")
+    st.subheader("🏦 Importador Real de Extratos Bancários (.OFX)")
     regras = {"TARIFA": ("9", "2", "Despesa Bancaria"), "TELEFONICA": ("9", "2", "Despesa com Telefone"), "MATERIAIS": ("9", "2", "Uso e Consumo")}
-    st.markdown("**Regras de conciliação:**")
+    st.markdown("**Regras de conciliação ativas:**")
     st.json(regras)
     uploaded_file = st.file_uploader("Arraste e solte o seu arquivo .ofx aqui", type=["ofx"])
     if uploaded_file is not None:
@@ -285,9 +373,9 @@ elif choice == "Importação OFX (Banco)":
                             dt_banco = datetime.strptime(linha['Data'], "%d/%m/%Y").strftime("%Y-%m-%d")
                             run_insert("diario", {"data": dt_banco, "conta_debito": deb_f, "conta_credito": cred_f, "valor": linha['Valor'], "historico": f"OFX: {linha['Histórico OFX']}", "origem": "OFX"})
                             sucessos += 1; break
-                st.success(f"Conciliação concluída! {sucessos} lançamentos gerados.")
+                st.success(f"Conciliação via OFX executada: {sucessos} lançamentos gerados.")
 elif choice == "Demonstrações Contábeis":
-    st.header("📋 Demonstrativos Oficiais (Padrão Normas Contábeis)")
+    st.subheader("📋 Demonstrativos Oficiais (Padrão Normas Contábeis)")
     diario_completo = run_query("diario")
     
     col_dt1, col_dt2 = st.columns(2)
@@ -295,7 +383,7 @@ elif choice == "Demonstrações Contábeis":
     with col_dt2: dt_fim = st.date_input("Data de Fim do Período", date(2025, 12, 31), format="DD/MM/YYYY")
     
     if diario_completo.empty or contas_df.empty:
-        st.warning("Efetue lançamentos e cadastre seu plano de contas para gerar os relatórios estruturados.")
+        st.warning("Plano de contas ou diário sem registros para o período.")
     else:
         contas_df['codigo_estruturado'] = contas_df['codigo_estruturado'].str.strip()
         contas_sorted = contas_df.sort_values(by="codigo_estruturado").copy()
@@ -357,23 +445,23 @@ elif choice == "Demonstrações Contábeis":
             st.dataframe(df_balancete_visual[["Classificação / Máscara", "Descrição da Conta", "Saldo Anterior", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True)
         with tab_dre:
             rec_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Receita' and '.' not in l['Classificação / Máscara'])
-            des_total = sum(l['_saldo_puro'] for l in lines_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação / Máscara'])
+            des_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação / Máscara'])
             lucro_liquido = rec_total - des_total
             st.markdown(f"**(+) RECEITA OPERACIONAL BRUTA:** R$ {max(0, rec_total):,.2f}")
-            st.markdown(f"**(-) DEDUÇÕES E IMPOSTOS INCIDENTES:** R$ {abs(min(0, rec_total)):,.2f}")
-            st.markdown(f"**(=) RECEITA LÍQUIDA DO PERÍODO:** R$ {rec_total:,.2f}")
-            st.markdown(f"**(-) DESPESAS ADMINISTRATIVAS / OPERACIONAIS:** R$ {des_total:,.2f}")
+            st.markdown(f"**(-) DEDUÇÕES E IMPOSTOS:** R$ {abs(min(0, rec_total)):,.2f}")
+            st.markdown(f"**(=) RECEITA LÍQUIDA:** R$ {rec_total:,.2f}")
+            st.markdown(f"**(-) DESPESAS ADMINISTRATIVAS:** R$ {des_total:,.2f}")
             st.markdown("---")
-            st.subheader(f"(=) RESULTADO LÍQUIDO NO PERÍODO: R$ {lucro_liquido:,.2f}")
+            st.subheader(f"(=) RESULTADO LÍQUIDO DO EXERCÍCIO: R$ {lucro_liquido:,.2f}")
         with tab_balanco:
             df_at = df_balancete_visual[df_balancete_visual['_grupo'] == 'Ativo'][["Classificação / Máscara", "Descrição da Conta", "Saldo Atual"]]
             df_pa_pl = df_balancete_visual[df_balancete_visual['_grupo'].isin(['Passivo', 'PL'])][["Classificação / Máscara", "Descrição da Conta", "Saldo Atual"]]
             c1, c2 = st.columns(2)
             with c1: st.info("**GRUPO 1 - ATIVO**"); st.write(df_at)
-            with c2: st.info("**GRUPO 2 - PASSIVO E PL**"); st.write(df_pa_pl); st.markdown(f"*(+) Lucro Líquido Incorporado: R$ {lucro_liquido:,.2f}*")
+            with c2: st.info("**GRUPO 2 - PASSIVO E PATRIMÔNIO LÍQUIDO**"); st.write(df_pa_pl); st.markdown(f"*(+) Lucro Líquido Incorporado: R$ {lucro_liquido:,.2f}*")
 
 elif choice == "Central de Relatórios Fiscais/Gerenciais":
-    st.header("🔍 Central Multicritério de Relatórios")
+    st.subheader("🔍 Central Multicritério de Relatórios")
     diario_livro = run_query("diario")
     
     if diario_livro.empty: st.warning("Sem movimentações registradas.")
@@ -403,11 +491,11 @@ elif choice == "Central de Relatórios Fiscais/Gerenciais":
         
         t1, t2, tab_f = st.tabs(["Livro Diário / Lançamentos do Período", "Relatório de Livros Fiscais", "Resumo da Folha por Competência"])
         with t1:
-            st.subheader("Lançamentos Contábeis Detalhados")
+            st.markdown("#### Lançamentos Contábeis Detalhados")
             st.dataframe(df_filtrado[["data", "conta_debito", "conta_credito", "valor", "historico", "origem"]], use_container_width=True)
         with t2:
-            st.subheader("Relatório Unificado de Entradas, Vendas e Serviços")
+            st.markdown("#### Relatório Unificado de Entradas, Vendas e Serviços")
             st.dataframe(df_filtrado[df_filtrado['origem'].isin(['Fiscal', 'Imposto Nota'])], use_container_width=True)
         with tab_f:
-            st.subheader("Histórico de Custos com Departamento Pessoal")
+            st.markdown("#### Histórico de Custos com Departamento Pessoal")
             st.dataframe(df_filtrado[df_filtrado['origem'] == 'Folha'], use_container_width=True)
