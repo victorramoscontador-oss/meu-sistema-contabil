@@ -14,7 +14,7 @@ st.markdown("""
     <style>
         @import url('https://googleapis.com');
         html, body, [data-testid="stAppViewContainer"], .stWidgetLabel, p, div {
-            font-family: 'Roboto', -apple-system, sans-serif !important;
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
             background-color: #FAFAFA !important;
             color: #1E293B !important;
         }
@@ -235,7 +235,7 @@ elif choice == "Lançamento de Notas":
         
         if st.form_submit_button("Processar e Gerar Lançamento Contábil"):
             if part_df.empty or acum_df.empty:
-                st.error("Erro: Cadastre um Participante e um Acumulador antes de lançar.")
+                st.error("Erro: Cadastre um Participante e um Acumulador antes de processar notas.")
             else:
                 id_p = int(participante_sel.split(" - "))
                 nome_p, conta_especifica_p = dict_part[id_p]
@@ -321,40 +321,48 @@ elif choice == "Importação OFX (Banco)":
 elif choice == "Demonstrações Contábeis":
     st.subheader("📋 Demonstrativos Oficiais (Padrão Normas Contábeis)")
     diario_completo = run_query("diario")
+    
     col_dt1, col_dt2 = st.columns(2)
     with col_dt1: dt_inicio = st.date_input("Data de Início do Período", date(2025, 1, 1), format="DD/MM/YYYY")
     with col_dt2: dt_fim = st.date_input("Data de Fim do Período", date(2025, 12, 31), format="DD/MM/YYYY")
+    
     if diario_completo.empty or contas_df.empty:
         st.warning("Plano de contas ou diário sem registros para o período.")
     else:
         contas_df['codigo_estruturado'] = contas_df['codigo_estruturado'].str.strip()
         contas_sorted = contas_df.sort_values(by="codigo_estruturado").copy()
+        
         diario_completo['data_dt'] = pd.to_datetime(diario_completo['data']).dt.date
         df_anterior = diario_completo[diario_completo['data_dt'] < dt_inicio]
         df_periodo = diario_completo[(diario_completo['data_dt'] >= dt_inicio) & (diario_completo['data_dt'] <= dt_fim)]
+        
         ant_deb = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         ant_cred = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         for _, lanc in df_anterior.iterrows():
             d, c, v = str(lanc['conta_debito']), str(lanc['conta_credito']), float(lanc['valor'])
             if d in ant_deb: ant_deb[d] += v
             if c in ant_cred: ant_cred[c] += v
+            
         per_deb = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         per_cred = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         for _, lanc in df_periodo.iterrows():
             d, c, v = str(lanc['conta_debito']), str(lanc['conta_credito']), float(lanc['valor'])
             if d in per_deb: per_deb[d] += v
             if c in per_cred: per_cred[c] += v
+
         linhas_balancete = []
         for _, row in contas_sorted.iterrows():
             mascara = row['codigo_estruturado']
             nome = row['nome']
             grupo_base = row['grupo']
+            
             sa_deb = 0.0; sa_cred = 0.0; sp_deb = 0.0; sp_cred = 0.0
             for _, r_sub in contas_sorted.iterrows():
                 if r_sub['codigo_estruturado'].startswith(mascara):
                     idx = str(r_sub['codigo_reduzido'])
                     sa_deb += ant_deb[idx]; sa_cred += ant_cred[idx]
                     sp_deb += per_deb[idx]; sp_cred += per_cred[idx]
+            
             if grupo_base in ['Ativo', 'Despesa']:
                 s_anterior = sa_deb - sa_cred
                 s_atual = (sa_deb + sp_deb) - (sa_cred + sp_cred)
@@ -365,13 +373,23 @@ elif choice == "Demonstrações Contábeis":
                 s_atual = (sa_cred + sp_cred) - (sa_deb + sp_deb)
                 nat_ant = "C" if s_anterior >= 0 else "D"
                 nat_at = "C" if s_atual >= 0 else "D"
-            linhas_balancete.append({"Classificação / Máscara": mascara, "Descrição da Conta": nome, "Saldo Anterior": f"R$ {abs(s_anterior):,.2f} {nat_ant}", "Débito": sp_deb, "Crédito": sp_cred, "Saldo Atual": f"R$ {abs(s_atual):,.2f} {nat_at}", "_saldo_puro": s_atual, "_grupo": grupo_base})
+                
+            linhas_balancete.append({
+                "Classificação / Máscara": mascara, "Descrição da Conta": nome,
+                "Saldo Anterior": f"R$ {abs(s_anterior):,.2f} {nat_ant}",
+                "Débito": sp_deb, "Crédito": sp_cred,
+                "Saldo Atual": f"R$ {abs(s_atual):,.2f} {nat_at}",
+                "_saldo_puro": s_atual, "_grupo": grupo_base
+            })
+            
         df_balancete_visual = pd.DataFrame(linhas_balancete)
         tab_balancete, tab_dre, tab_balanco = st.tabs(["Balancete por Níveis", "DRE Oficial", "Balanço Patrimonial"])
-        with tab_balancete: st.dataframe(df_balancete_visual[["Classificação / Máscara", "Descrição da Conta", "Saldo Anterior", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True)
+        
+        with tab_balancete:
+            st.dataframe(df_balancete_visual[["Classificação / Máscara", "Descrição da Conta", "Saldo Anterior", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True)
         with tab_dre:
             rec_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Receita' and '.' not in l['Classificação / Máscara'])
-            des_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação / Máscara'])
+            des_total = sum(l['_saldo_puro'] for l in lines_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação / Máscara'])
             lucro_liquido = rec_total - des_total
             st.markdown(f"**(+) RECEITA OPERACIONAL BRUTA:** R$ {max(0, rec_total):,.2f}")
             st.markdown(f"**(-) DEDUÇÕES E IMPOSTOS:** R$ {abs(min(0, rec_total)):,.2f}")
@@ -389,12 +407,14 @@ elif choice == "Demonstrações Contábeis":
 elif choice == "Central de Relatórios Fiscais/Gerenciais":
     st.subheader("🔍 Central Multicritério de Relatórios")
     diario_livro = run_query("diario")
+    
     if diario_livro.empty: st.warning("Sem movimentações registradas.")
     else:
         diario_livro['data_dt'] = pd.to_datetime(diario_livro['data']).dt.date
         col_dt_i, col_dt_f = st.columns(2)
         with col_dt_i: r_inicio = st.date_input("Início do Filtro", date(2025, 1, 1), format="DD/MM/YYYY")
         with col_dt_f: r_fim = st.date_input("Fim do Filtro", date(2025, 12, 31), format="DD/MM/YYYY")
+        
         df_filtrado = diario_livro[(diario_livro['data_dt'] >= r_inicio) & (diario_livro['data_dt'] <= r_fim)]
         col_f2, col_f3, col_f4 = st.columns(3)
         with col_f2:
@@ -406,11 +426,20 @@ elif choice == "Central de Relatórios Fiscais/Gerenciais":
         with col_f4:
             lista_part_f = ["Todos"] + (list(df_filtrado['participante'].dropna().unique()) if 'participante' in df_filtrado.columns else [])
             sel_part = st.selectbox("Filtrar por Cliente / Fornecedor", lista_part_f)
+            
         if sel_acum != "Todos": df_filtrado = df_filtrado[df_filtrado['acumulador'] == sel_acum]
         if sel_cfop != "Todos": df_filtrado = df_filtrado[df_filtrado['cfop'] == sel_cfop]
         if sel_part != "Todos": df_filtrado = df_filtrado[df_filtrado['participante'] == sel_part]
+        
         df_filtrado['data'] = df_filtrado['data'].apply(formatar_data_br)
-        t1, t2, tab_f = st.tabs(["Livro Diário / Lançamentos", "Relatório de Livros Fiscais", "Resumo da Folha"])
-        with t1: st.dataframe(df_filtrado[["data", "conta_debito", "conta_credito", "valor", "historico", "origem"]], use_container_width=True)
-        with t2: st.dataframe(df_filtrado[df_filtrado['origem'].isin(['Fiscal', 'Imposto Nota'])], use_container_width=True)
-        with tab_f: st.dataframe(df_filtrado[df_filtrado['origem'] == 'Folha'], use_container_width=True)
+        
+        t1, t2, tab_f = st.tabs(["Livro Diário / Lançamentos do Período", "Relatório de Livros Fiscais", "Resumo da Folha por Competência"])
+        with t1:
+            st.markdown("#### Lançamentos Contábeis Detalhados")
+            st.dataframe(df_filtrado[["data", "conta_debito", "conta_credito", "valor", "historico", "origem"]], use_container_width=True)
+        with t2:
+            st.markdown("#### Relatório Unificado de Entradas, Vendas e Serviços")
+            st.dataframe(df_filtrado[df_filtrado['origem'].isin(['Fiscal', 'Imposto Nota'])], use_container_width=True)
+        with tab_f:
+            st.markdown("#### Histórico de Custos com Departamento Pessoal")
+            st.dataframe(df_filtrado[df_filtrado['origem'] == 'Folha'], use_container_width=True)
