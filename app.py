@@ -10,12 +10,10 @@ import re
 # =========================================================================
 st.set_page_config(page_title="Fluxo Assessoria Financeira", layout="wide", initial_sidebar_state="expanded")
 
-# Injeção de Estilo Avançado CSS Professional UX/UI com Tipografia Corporativa
 st.markdown("""
     <style>
         @import url('https://googleapis.com');
         
-        /* Reset de Tipografia Global */
         html, body, [data-testid="stAppViewContainer"], .stWidgetLabel, p, div {
             font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
             background-color: #FAFAFA !important;
@@ -23,7 +21,6 @@ st.markdown("""
             letter-spacing: -0.1px !important;
         }
         
-        /* Menu Lateral (Sidebar) Executivo */
         section[data-testid="stSidebar"] {
             background-color: #031F11 !important;
             border-right: 1px solid #0C2E19 !important;
@@ -31,7 +28,6 @@ st.markdown("""
         section[data-testid="stSidebar"] * {
             color: #F1F5F9 !important;
             font-size: 14px !important;
-            font-family: 'Roboto', sans-serif !important;
         }
         section[data-testid="stSidebar"] .stSelectbox label {
             color: #94A3B8 !important;
@@ -41,24 +37,20 @@ st.markdown("""
             letter-spacing: 0.5px !important;
         }
         
-        /* Títulos Marcantes */
         h1, h2, h3, [data-testid="stHeader"] {
-            font-family: 'Roboto', -apple-system, sans-serif !important;
             font-weight: 700 !important;
             color: #031F11 !important;
             letter-spacing: -0.5px !important;
         }
         
-        /* Cards de Conteúdo */
         div[data-testid="stForm"], div[data-testid="element-container"] > div.stAlert {
             background-color: #FFFFFF !important;
             border: 1px solid #E2E8F0 !important;
             border-radius: 8px !important;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px 0 rgba(0, 0, 0, 0.03) !important;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05) !important;
             padding: 28px !important;
         }
         
-        /* Customização dos Inputs */
         input, select, textarea {
             background-color: #FFFFFF !important;
             border: 1px solid #CBD5E1 !important;
@@ -68,7 +60,6 @@ st.markdown("""
             font-size: 14px !important;
         }
         
-        /* Botões */
         div.stButton > button {
             background: #031F11 !important;
             color: #FFFFFF !important;
@@ -85,21 +76,15 @@ st.markdown("""
         div.stButton > button:hover {
             background: #10B981 !important;
             border-color: #10B981 !important;
-            color: #FFFFFF !important;
             box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2) !important;
         }
         
-        /* Tabelas */
-        div[data-testid="stDataFrame"] table {
-            border-collapse: collapse !important;
-        }
         div[data-testid="stDataFrame"] th {
             background-color: #F8FAFC !important;
             color: #475569 !important;
             font-weight: 700 !important;
             text-transform: uppercase !important;
             font-size: 12px !important;
-            letter-spacing: 0.3px !important;
             border-bottom: 2px solid #E2E8F0 !important;
         }
         div[data-testid="stDataFrame"] td {
@@ -110,7 +95,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 1. CONEXÃO COM O BANCO DE DADOS
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
@@ -148,7 +132,6 @@ def formatar_data_br(data_str):
         return dt.strftime("%d/%m/%Y")
     except: return data_str
 
-# 2. CONTROLE DE ACESSO
 USUARIO_MASTER = "contador"
 SENHA_HASH_MASTER = criar_hash("admin123") 
 
@@ -176,7 +159,6 @@ if not st.session_state['autenticado']:
     with col_c: tela_login()
     st.stop()
 
-# 3. INTERFACE INTEGRADA
 st.sidebar.markdown("""
     <div style='text-align: center; padding: 20px 0; border-bottom: 1px solid #0C2E19; margin-bottom: 25px;'>
         <h3 style='color: #FFFFFF; margin: 0; font-size: 18px; font-weight: 700; letter-spacing: 0.5px;'>FLUXO ASSESSORIA</h3>
@@ -266,7 +248,7 @@ if choice == "Cadastros Base":
                     e_grp = st.selectbox("Novo Grupo", ["Ativo", "Passivo", "PL", "Receita", "Despesa"], index=["Ativo", "Passivo", "PL", "Receita", "Despesa"].index(d_orig['grupo']))
                     if st.form_submit_button("Salvar Alterações"):
                         if run_update("plano_contas", "codigo_reduzido", d_orig['codigo_reduzido'], {"nome": e_nome, "codigo_estruturado": e_est, "grupo": e_grp}):
-                            st.success("Conta updated!"); st.rerun()
+                            st.success("Conta atualizada!"); st.rerun()
         if not contas_df.empty: st.dataframe(contas_df.sort_values(by="codigo_estruturado"), use_container_width=True)
 elif choice == "Lançamento de Notas":
     st.subheader("🧾 Escrituração Fiscal Dinâmica (Padrão Domínio)")
@@ -445,7 +427,7 @@ elif choice == "Demonstrações Contábeis":
             st.dataframe(df_balancete_visual[["Classificação / Máscara", "Descrição da Conta", "Saldo Anterior", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True)
         with tab_dre:
             rec_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Receita' and '.' not in l['Classificação / Máscara'])
-            des_total = sum(l['_saldo_puro'] for l in lines_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação / Máscara'])
+            des_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação / Máscara'])
             lucro_liquido = rec_total - des_total
             st.markdown(f"**(+) RECEITA OPERACIONAL BRUTA:** R$ {max(0, rec_total):,.2f}")
             st.markdown(f"**(-) DEDUÇÕES E IMPOSTOS:** R$ {abs(min(0, rec_total)):,.2f}")
@@ -485,7 +467,7 @@ elif choice == "Central de Relatórios Fiscais/Gerenciais":
             
         if sel_acum != "Todos": df_filtrado = df_filtrado[df_filtrado['acumulador'] == sel_acum]
         if sel_cfop != "Todos": df_filtrado = df_filtrado[df_filtrado['cfop'] == sel_cfop]
-        if sel_part != "Todos": df_filtrado = df_filtrado[df_filtrante == sel_part]
+        if sel_part != "Todos": df_filtrado = df_filtrado[df_filtrado['participante'] == sel_part]
         
         df_filtrado['data'] = df_filtrado['data'].apply(formatar_data_br)
         
