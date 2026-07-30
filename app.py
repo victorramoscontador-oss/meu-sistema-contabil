@@ -56,8 +56,7 @@ def tela_login():
             else: st.error("Usuário ou senha incorretos.")
 
 if not st.session_state['autenticado']:
-    tela_login()
-    st.stop()
+    tela_login(); st.stop()
 
 # 3. INTERFACE E MENUS
 st.set_page_config(page_title="Sistema Contábil Próprio", layout="wide")
@@ -88,7 +87,7 @@ if choice == "Cadastros Base":
             if not contas_df.empty: lista_c += [f"{r['codigo_reduzido']} - {r['nome']}" for _, r in contas_df.iterrows()]
             conta_p = st.selectbox("Conta Contábil Específica", lista_c)
             if st.form_submit_button("Salvar Novo Participante"):
-                c_red = conta_p.split(" - ")[0] if conta_p != "Padrão do Acumulador" else None
+                c_red = conta_p.split(" - ") if conta_p != "Padrão do Acumulador" else None
                 if run_insert("participantes", {"nome": nome, "documento": doc, "tipo": tipo, "conta_contabil": c_red}):
                     st.success("Cadastrado!"); st.rerun()
         if not part_df.empty: st.dataframe(part_df, use_container_width=True)
@@ -112,10 +111,12 @@ if choice == "Cadastros Base":
             c_deb = st.selectbox("Conta Débito", c_dinamico)
             c_cred = st.selectbox("Conta Crédito", c_dinamico)
             l_hist = [f"{r['codigo']} - {r['descricao']}" for _, r in hist_df.iterrows()] if not hist_df.empty else []
-            h_pad = st.selectbox("Histórico Padrão Base", l_hist) if l_hist else st.text_input("Histórico Manual (Ex: 100)")
+            h_pad = st.selectbox("Histórico Padrão Base", l_hist) if l_hist else st.text_input("Histórico Manual")
             aliq = st.number_input("Alíquota (%)", min_value=0.0, max_value=100.0, step=0.1)
             if st.form_submit_button("Salvar Novo Acumulador"):
-                d_c = c_deb.split(" - ")[0]; c_c = c_cred.split(" - ")[0]; h_c = h_pad.split(" - ")[0]
+                d_c = c_deb.split(" - ") if " - " in c_deb else c_deb
+                c_c = c_cred.split(" - ") if " - " in c_cred else c_cred
+                h_c = h_pad.split(" - ") if " - " in h_pad else h_pad
                 if run_insert("acumuladores", {"codigo": cod_a, "descricao": desc_a, "operacao": op_a, "conta_debito": d_c, "conta_credito": c_c, "historico_padrao": h_c, "aliquota_imposto": aliq/100}):
                     st.success("Acumulador Cadastrado!"); st.rerun()
         if not acum_df.empty: st.dataframe(acum_df, use_container_width=True)
@@ -126,7 +127,7 @@ if choice == "Cadastros Base":
             st.markdown("**Adicionar Nova Conta**")
             with st.form("new_acc"):
                 n_red = st.text_input("Código Reduzido")
-                n_est = st.text_input("Código Estruturado")
+                n_est = st.text_input("Classificação / Máscara")
                 n_nome = st.text_input("Nome da Conta")
                 n_grp = st.selectbox("Grupo Contábil", ["Ativo", "Passivo", "PL", "Receita", "Despesa"])
                 if st.form_submit_button("Adicionar Conta"):
@@ -144,8 +145,9 @@ if choice == "Cadastros Base":
                     e_grp = st.selectbox("Novo Grupo", ["Ativo", "Passivo", "PL", "Receita", "Despesa"], index=["Ativo", "Passivo", "PL", "Receita", "Despesa"].index(d_orig['grupo']))
                     if st.form_submit_button("Salvar Alterações"):
                         if run_update("plano_contas", "codigo_reduzido", d_orig['codigo_reduzido'], {"nome": e_nome, "codigo_estruturado": e_est, "grupo": e_grp}):
-                            st.success("Conta atualizada!"); st.rerun()
+                            st.success("Conta updated!"); st.rerun()
         if not contas_df.empty: st.dataframe(contas_df.sort_values(by="codigo_estruturado"), use_container_width=True)
+
 elif choice == "Lançamento de Notas":
     st.header("🧾 Escrituração Fiscal Dinâmica (Padrão Domínio)")
     with st.form("form_nota"):
@@ -166,7 +168,6 @@ elif choice == "Lançamento de Notas":
             acum_sel = st.selectbox("Acumulador Contábil", lista_a)
             valor_nf = st.number_input("Valor Bruto da Nota (R$)", min_value=0.0, step=10.0)
             regime = st.selectbox("Regime Tributário:", ["Simples Nacional", "Lucro Presumido"])
-        
         if st.form_submit_button("Processar e Gerar Lançamento Contábil"):
             if part_df.empty or acum_df.empty:
                 st.error("Erro: Cadastre um Participante e um Acumulador no menu 'Cadastros Base' antes de processar notas.")
@@ -199,11 +200,9 @@ elif choice == "Lançamento Manual":
         m_val = st.number_input("Valor (R$)", min_value=0.01, step=10.0)
         m_hist = st.text_input("Histórico Contábil")
         if st.form_submit_button("Gravar Lançamento Manual"):
-            if contas_df.empty:
-                st.error("Erro: Cadastre as contas contábeis na aba 'Plano de Contas' antes de lançar.")
+            if contas_df.empty: st.error("Erro: Cadastre as contas contábeis primeiro.")
             else:
-                c_d_red = m_deb.split(" - ")[0]
-                c_c_red = m_cred.split(" - ")[0]
+                c_d_red = m_deb.split(" - ")[0]; c_c_red = m_cred.split(" - ")[0]
                 if run_insert("diario", {"data": str(m_data), "conta_debito": c_d_red, "conta_credito": c_c_red, "valor": m_val, "historico": m_hist, "origem": "Manual"}):
                     st.success("Gravado com sucesso no Diário!")
 
@@ -249,37 +248,61 @@ elif choice == "Importação OFX (Banco)":
                             deb_f = c_deb if linha['Tipo'] == "Débito" else "2"
                             cred_f = c_cred if linha['Tipo'] == "Débito" else c_deb
                             run_insert("diario", {"data": linha['Data'], "conta_debito": deb_f, "conta_credito": cred_f, "valor": linha['Valor'], "historico": f"OFX: {linha['Histórico OFX']}", "origem": "OFX"})
-                            sucessos += 1
-                            break
+                            sucessos += 1; break
                 st.success(f"Conciliação concluída! {sucessos} lançamentos gerados.")
 
 elif choice == "Demonstrações Contábeis":
-    st.header("📋 Demonstrativos Oficiais (Tempo Real)")
+    st.header("📋 Demonstrativos Oficiais (Padrão Normas Contábeis)")
     diario_completo = run_query("diario")
-    if diario_completo.empty:
-        st.warning("Nenhum lançamento contábil registrado no Livro Diário ainda.")
+    if diario_completo.empty or contas_df.empty:
+        st.warning("Efetue lançamentos e cadastre seu plano de contas para gerar os relatórios estruturados.")
     else:
-        saldos = {row['codigo_reduzido']: {'nome': row['nome'], 'grupo': row['grupo'], 'saldo': 0.0} for _, row in contas_df.iterrows()} if not contas_df.empty else {}
+        contas_df['codigo_estruturado'] = contas_df['codigo_estruturado'].str.strip()
+        contas_sorted = contas_df.sort_values(by="codigo_estruturado").copy()
+        saldos_analiticos = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
+        deb_totais = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
+        cred_totais = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
         for _, lanc in diario_completo.iterrows():
             d, c, v = str(lanc['conta_debito']), str(lanc['conta_credito']), float(lanc['valor'])
-            if d in saldos: saldos[d]['saldo'] += v if saldos[d]['grupo'] in ['Ativo', 'Despesa'] else -v
-            if c in saldos: saldos[c]['saldo'] += v if saldos[c]['grupo'] in ['Passivo', 'PL', 'Receita'] else -v
-        df_saldos = pd.DataFrame.from_dict(saldos, orient='index').reset_index()
-        tab_balancete, tab_dre, tab_balanco = st.tabs(["Balancete", "DRE", "Balanço Patrimonial"])
-        with tab_balancete: st.dataframe(df_saldos, use_container_width=True)
+            if d in saldos_analiticos: saldos_analiticos[d] += v; deb_totais[d] += v
+            if c in saldos_analiticos: saldos_analiticos[c] -= v; cred_totais[c] += v
+        linhas_balancete = []
+        for _, row in contas_sorted.iterrows():
+            mascara = row['codigo_estruturado']
+            nome = row['nome']
+            grupo_base = row['grupo']
+            s_deb = 0.0; s_cred = 0.0
+            for _, r_sub in contas_sorted.iterrows():
+                if r_sub['codigo_estruturado'].startswith(mascara):
+                    idx = str(r_sub['codigo_reduzido'])
+                    s_deb += deb_totais[idx]; s_cred += cred_totais[idx]
+            if grupo_base in ['Ativo', 'Despesa']:
+                saldo_atual = s_deb - s_cred
+                natureza = "D" if saldo_atual >= 0 else "C"
+            else:
+                saldo_atual = s_cred - s_deb
+                natureza = "C" if saldo_atual >= 0 else "D"
+            linhas_balancete.append({"Classificação": mascara, "Descrição da Conta": nome, "Débito": s_deb, "Crédito": s_cred, "Saldo Atual": f"R$ {abs(saldo_atual):,.2f} {natureza}", "_saldo_puro": saldo_atual, "_grupo": grupo_base})
+        df_balancete_visual = pd.DataFrame(linhas_balancete)
+        tab_balancete, tab_dre, tab_balanco = st.tabs(["Balancete por Níveis", "DRE Dedutiva", "Balanço Patrimonial Vertical"])
+        with tab_balancete:
+            st.subheader("Balancete de Verificação Estruturado")
+            st.dataframe(df_balancete_visual[["Classificação", "Descrição da Conta", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True)
         with tab_dre:
-            rec = df_saldos[df_saldos['grupo'] == 'Receita']['saldo'].sum() if not df_saldos.empty else 0
-            des = df_saldos[df_saldos['grupo'] == 'Despesa']['saldo'].sum() if not df_saldos.empty else 0
-            st.metric("(+) Receitas", f"R$ {rec:.2f}"); st.metric("(-) Despesas", f"R$ {des:.2f}")
-            st.subheader(f"Resultado Líquido: R$ {rec - des:.2f}")
+            st.subheader("Demonstração do Resultado do Exercício (DRE)")
+            rec_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Receita' and '.' not in l['Classificação'])
+            des_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação'])
+            lucro_liquido = rec_total - des_total
+            st.markdown(f"**(+) RECEITA OPERACIONAL BRUTA:** R$ {max(0, rec_total):,.2f}")
+            st.markdown(f"**(-) DEDUÇÕES E IMPOSTOS INCIDENTES:** R$ {abs(min(0, rec_total)):,.2f}")
+            st.markdown(f"**(=) RECEITA LÍQUIDA:** R$ {rec_total:,.2f}")
+            st.markdown(f"**(-) DESPESAS ADMINISTRATIVAS / OPERACIONAIS:** R$ {des_total:,.2f}")
+            st.markdown("---")
+            st.subheader(f"(=) RESULTADO LÍQUIDO DO EXERCÍCIO: R$ {lucro_liquido:,.2f}")
         with tab_balanco:
-            at = df_saldos[df_saldos['grupo'] == 'Ativo']['saldo'].sum() if not df_saldos.empty else 0
-            pa = df_saldos[df_saldos['grupo'] == 'Passivo']['saldo'].sum() if not df_saldos.empty else 0
-            pl = df_saldos[df_saldos['grupo'] == 'PL']['saldo'].sum() + (rec - des) if not df_saldos.empty else 0
+            st.subheader("Balanço Patrimonial Estruturado")
+            df_ativo = df_balancete_visual[df_balancete_visual['_grupo'] == 'Ativo'][["Classificação", "Descrição da Conta", "Saldo Atual"]]
+            df_passivo_pl = df_balancete_visual[df_balancete_visual['_grupo'].isin(['Passivo', 'PL'])][["Classificação", "Descrição da Conta", "Saldo Atual"]]
             c1, c2 = st.columns(2)
-            with c1:
-                st.info(f"ATIVO: R$ {at:.2f}")
-                st.write(df_saldos[df_saldos['grupo'] == 'Ativo'] if not df_saldos.empty else "")
-            with c2:
-                st.info(f"PASSIVO + PL: R$ {pa + pl:.2f}")
-                st.write(df_saldos[df_saldos['grupo'].isin(['Passivo', 'PL'])] if not df_saldos.empty else "")
+            with c1: st.info("**GRUPO 1 - ATIVO**"); st.write(df_ativo)
+            with c2: st.info("**GRUPO 2 - PASSIVO E PATRIMÔNIO LÍQUIDO**"); st.write(df_passivo_pl); st.markdown(f"*(+) Lucro do Exercício Corrente Incorporado: R$ {lucro_liquido:,.2f}*")
