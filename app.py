@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from supabase import create_client
+from supabase import Client
 from datetime import datetime, date
 import hashlib
 import re
@@ -25,8 +25,8 @@ SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
 @st.cache_resource
 def get_supabase_client():
-    # Inicialização direta corrigida para evitar erro de proxy nas novas versões
-    return create_client(supabase_url=SUPABASE_URL, supabase_key=SUPABASE_KEY)
+    # Inicialização direta via classe Client para contornar o bug de proxy do Streamlit
+    return Client(supabase_url=SUPABASE_URL, supabase_key=SUPABASE_KEY)
 
 supabase = get_supabase_client()
 
