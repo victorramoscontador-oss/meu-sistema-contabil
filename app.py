@@ -7,7 +7,6 @@ import re
 
 st.set_page_config(page_title="Fluxo Assessoria Financeira", layout="wide")
 
-# Marca e Identidade Visual Otimizada (Verde e Branco)
 st.markdown("""
     <style>
         html, body, [data-testid="stAppViewContainer"], .stWidgetLabel, p, div {
@@ -21,13 +20,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Coleta das chaves exatamente com o nome que está na sua caixa preta do Streamlit
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
 @st.cache_resource
 def get_supabase_client():
-    return create_client(SUPABASE_URL, SUPABASE_KEY)
+    # Inicialização direta corrigida para evitar erro de proxy nas novas versões
+    return create_client(supabase_url=SUPABASE_URL, supabase_key=SUPABASE_KEY)
 
 supabase = get_supabase_client()
 
