@@ -5,6 +5,33 @@ from datetime import datetime, date
 import hashlib
 import re
 
+# ==========================================
+# CUSTOMIZAÇÃO VISUAL: FLUXO ASSESSORIA FINANCEIRA
+# ==========================================
+st.set_page_config(page_title="Fluxo Assessoria Financeira - Sistema Contábil", layout="wide")
+
+# Injeção de estilo CSS para forçar as cores Verde e Branco da sua marca
+st.markdown("""
+    <style>
+        /* Cor de fundo principal e textos */
+        .stApp { background-color: #FFFFFF; color: #1E293B; }
+        /* Barra lateral (Sidebar) em tom verde escuro elegante */
+        section[data-testid="stSidebar"] { background-color: #064E3B !important; }
+        section[data-testid="stSidebar"] * { color: #FFFFFF !important; }
+        /* Botões em Verde institucional */
+        div.stButton > button:first-child {
+            background-color: #10B981 !important; color: white !important;
+            border-radius: 6px !important; border: none !important;
+        }
+        div.stButton > button:first-child:hover { background-color: #059669 !important; }
+        /* Abas e Menus selecionados */
+        button[data-baseweb="tab"] { color: #475569 !important; }
+        button[aria-selected="true"] { color: #10B981 !important; border-bottom-color: #10B981 !important; }
+        /* Mensagens de sucesso */
+        .stAlert { background-color: #E6F4EA !important; color: #137333 !important; }
+    </style>
+""", unsafe_allow_html=True)
+
 # 1. CONEXÃO COM O BANCO DE DADOS
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
@@ -41,8 +68,7 @@ def formatar_data_br(data_str):
     try:
         dt = datetime.strptime(data_str, "%Y-%m-%d")
         return dt.strftime("%d/%m/%Y")
-    except:
-        return data_str
+    except: return data_str
 
 # 2. CONTROLE DE ACESSO (LOGIN)
 USUARIO_MASTER = "contador"
@@ -52,7 +78,7 @@ if 'autenticado' not in st.session_state:
     st.session_state['autenticado'] = False
 
 def tela_login():
-    st.markdown("<h3 style='text-align: center;'>🔒 Acesso Restrito - Controle Contábil</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #064E3B;'>🔒 Fluxo Assessoria Financeira<br><span style='font-size:16px; color:#475569;'>Acesso ao Painel Particular</span></h3>", unsafe_allow_html=True)
     with st.form("login_form"):
         user = st.text_input("Usuário", placeholder="Digite seu usuário")
         password = st.text_input("Senha", type="password", placeholder="Digite sua senha")
@@ -65,14 +91,15 @@ def tela_login():
 if not st.session_state['autenticado']:
     tela_login(); st.stop()
 
-# 3. INTERFACE E MENUS
-st.set_page_config(page_title="Sistema Contábil Próprio", layout="wide")
-
+# 3. INTERFACE E MENUS DA FLUXO
 if st.sidebar.button("🚪 Sair do Sistema"):
     st.session_state['autenticado'] = False
     st.rerun()
 
-st.title("📊 Mini Domínio - Sistema Contábil Particular")
+# Espaço reservado para carregar sua imagem da logo na barra lateral se você quiser arrastá-la no futuro
+st.sidebar.markdown("<h2 style='text-align: center; color: white; font-size: 20px;'>📈 FLUXO</h2>", unsafe_allow_html=True)
+
+st.title("💼 Fluxo Assessoria Financeira - Gestão Contábil Particular")
 menu = ["Lançamento de Notas", "Lançamento Manual", "Folha de Pagamento", "Importação OFX (Banco)", "Demonstrações Contábeis", "Central de Relatórios Fiscais/Gerenciais", "Cadastros Base"]
 choice = st.sidebar.selectbox("Navegação do Sistema", menu)
 
@@ -133,7 +160,7 @@ if choice == "Cadastros Base":
             st.markdown("**Adicionar Nova Conta**")
             with st.form("new_acc"):
                 n_red = st.text_input("Código Reduzido")
-                n_est = st.text_input("Classificação / Máscara (Ex: 1.1.1.01.0001)")
+                n_est = st.text_input("Classificação / Máscara")
                 n_nome = st.text_input("Nome da Conta")
                 n_grp = st.selectbox("Grupo Contábil", ["Ativo", "Passivo", "PL", "Receita", "Despesa"])
                 if st.form_submit_button("Adicionar Conta"):
@@ -176,7 +203,7 @@ elif choice == "Lançamento de Notas":
         
         if st.form_submit_button("Processar e Gerar Lançamento Contábil"):
             if part_df.empty or acum_df.empty:
-                st.error("Erro: Cadastre um Participante e um Acumulador no menu 'Cadastros Base' antes de processar notas.")
+                st.error("Erro: Cadastre um Participante e um Acumulador antes de processar notas.")
             else:
                 id_p = int(participante_sel.split(" - "))
                 nome_p, conta_especifica_p = dict_part[id_p]
@@ -255,13 +282,12 @@ elif choice == "Importação OFX (Banco)":
                         if termo in hist_banco:
                             deb_f = c_deb if linha['Tipo'] == "Débito" else "2"
                             cred_f = c_cred if linha['Tipo'] == "Débito" else c_deb
-                            # Converte de volta para salvar no banco padrão AAAA-MM-DD
                             dt_banco = datetime.strptime(linha['Data'], "%d/%m/%Y").strftime("%Y-%m-%d")
                             run_insert("diario", {"data": dt_banco, "conta_debito": deb_f, "conta_credito": cred_f, "valor": linha['Valor'], "historico": f"OFX: {linha['Histórico OFX']}", "origem": "OFX"})
                             sucessos += 1; break
                 st.success(f"Conciliação concluída! {sucessos} lançamentos gerados.")
 elif choice == "Demonstrações Contábeis":
-    st.header("📋 Demonstrativos Reais (Com Saldo Anterior e Filtro de Datas)")
+    st.header("📋 Demonstrativos Oficiais (Padrão Normas Contábeis)")
     diario_completo = run_query("diario")
     
     col_dt1, col_dt2 = st.columns(2)
@@ -269,7 +295,7 @@ elif choice == "Demonstrações Contábeis":
     with col_dt2: dt_fim = st.date_input("Data de Fim do Período", date(2025, 12, 31), format="DD/MM/YYYY")
     
     if diario_completo.empty or contas_df.empty:
-        st.warning("Cadastre as contas e faça lançamentos para visualizar os relatórios.")
+        st.warning("Efetue lançamentos e cadastre seu plano de contas para gerar os relatórios estruturados.")
     else:
         contas_df['codigo_estruturado'] = contas_df['codigo_estruturado'].str.strip()
         contas_sorted = contas_df.sort_values(by="codigo_estruturado").copy()
@@ -331,7 +357,7 @@ elif choice == "Demonstrações Contábeis":
             st.dataframe(df_balancete_visual[["Classificação / Máscara", "Descrição da Conta", "Saldo Anterior", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True)
         with tab_dre:
             rec_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Receita' and '.' not in l['Classificação / Máscara'])
-            des_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação / Máscara'])
+            des_total = sum(l['_saldo_puro'] for l in lines_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação / Máscara'])
             lucro_liquido = rec_total - des_total
             st.markdown(f"**(+) RECEITA OPERACIONAL BRUTA:** R$ {max(0, rec_total):,.2f}")
             st.markdown(f"**(-) DEDUÇÕES E IMPOSTOS INCIDENTES:** R$ {abs(min(0, rec_total)):,.2f}")
@@ -358,7 +384,6 @@ elif choice == "Central de Relatórios Fiscais/Gerenciais":
         with col_dt_f: r_fim = st.date_input("Fim do Filtro", date(2025, 12, 31), format="DD/MM/YYYY")
         
         df_filtrado = diario_livro[(diario_livro['data_dt'] >= r_inicio) & (diario_livro['data_dt'] <= r_fim)]
-        
         col_f2, col_f3, col_f4 = st.columns(3)
         with col_f2:
             lista_ac_f = ["Todos"] + (list(df_filtrado['acumulador'].dropna().unique()) if 'acumulador' in df_filtrado.columns else [])
