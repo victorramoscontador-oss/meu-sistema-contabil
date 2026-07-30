@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
-from datetime import datetime
+from datetime import datetime, date
 import hashlib
 import re
 
@@ -66,7 +66,7 @@ if st.sidebar.button("🚪 Sair do Sistema"):
     st.rerun()
 
 st.title("📊 Mini Domínio - Sistema Contábil Particular")
-menu = ["Lançamento de Notas", "Lançamento Manual", "Folha de Pagamento", "Importação OFX (Banco)", "Demonstrações Contábeis", "Cadastros Base"]
+menu = ["Lançamento de Notas", "Lançamento Manual", "Folha de Pagamento", "Importação OFX (Banco)", "Demonstrações Contábeis", "Central de Relatórios Fiscais/Gerenciais", "Cadastros Base"]
 choice = st.sidebar.selectbox("Navegação do Sistema", menu)
 
 contas_df = run_query("plano_contas")
@@ -106,6 +106,7 @@ if choice == "Cadastros Base":
             cod_a = st.text_input("Código do Acumulador")
             desc_a = st.text_input("Descrição da Operação")
             op_a = st.selectbox("Tipo de Movimento", ["Entrada", "Saída", "Serviço Prestado"])
+            cfop_a = st.text_input("CFOP Associado (Ex: 5102, 1102)")
             c_dinamico = ["FORNECEDOR", "CLIENTE"]
             if not contas_df.empty: c_dinamico += [f"{r['codigo_reduzido']} - {r['nome']}" for _, r in contas_df.iterrows()]
             c_deb = st.selectbox("Conta Débito", c_dinamico)
@@ -114,10 +115,8 @@ if choice == "Cadastros Base":
             h_pad = st.selectbox("Histórico Padrão Base", l_hist) if l_hist else st.text_input("Histórico Manual")
             aliq = st.number_input("Alíquota (%)", min_value=0.0, max_value=100.0, step=0.1)
             if st.form_submit_button("Salvar Novo Acumulador"):
-                d_c = c_deb.split(" - ") if " - " in c_deb else c_deb
-                c_c = c_cred.split(" - ") if " - " in c_cred else c_cred
-                h_c = h_pad.split(" - ") if " - " in h_pad else h_pad
-                if run_insert("acumuladores", {"codigo": cod_a, "descricao": desc_a, "operacao": op_a, "conta_debito": d_c, "conta_credito": c_c, "historico_padrao": h_c, "aliquota_imposto": aliq/100}):
+                d_c = c_deb.split(" - "); c_c = c_cred.split(" - "); h_c = h_pad.split(" - ")
+                if run_insert("acumuladores", {"codigo": cod_a, "descricao": desc_a, "operacao": op_a, "conta_debito": d_c, "conta_credito": c_c, "historico_padrao": h_c, "aliquota_imposto": aliq/100, "cfop": cfop_a}):
                     st.success("Acumulador Cadastrado!"); st.rerun()
         if not acum_df.empty: st.dataframe(acum_df, use_container_width=True)
     with tab4:
@@ -127,7 +126,7 @@ if choice == "Cadastros Base":
             st.markdown("**Adicionar Nova Conta**")
             with st.form("new_acc"):
                 n_red = st.text_input("Código Reduzido")
-                n_est = st.text_input("Classificação / Máscara")
+                n_est = st.text_input("Classificação / Máscara (Ex: 1.1.1.01.0001)")
                 n_nome = st.text_input("Nome da Conta")
                 n_grp = st.selectbox("Grupo Contábil", ["Ativo", "Passivo", "PL", "Receita", "Despesa"])
                 if st.form_submit_button("Adicionar Conta"):
@@ -145,9 +144,8 @@ if choice == "Cadastros Base":
                     e_grp = st.selectbox("Novo Grupo", ["Ativo", "Passivo", "PL", "Receita", "Despesa"], index=["Ativo", "Passivo", "PL", "Receita", "Despesa"].index(d_orig['grupo']))
                     if st.form_submit_button("Salvar Alterações"):
                         if run_update("plano_contas", "codigo_reduzido", d_orig['codigo_reduzido'], {"nome": e_nome, "codigo_estruturado": e_est, "grupo": e_grp}):
-                            st.success("Conta updated!"); st.rerun()
+                            st.success("Conta atualizada!"); st.rerun()
         if not contas_df.empty: st.dataframe(contas_df.sort_values(by="codigo_estruturado"), use_container_width=True)
-
 elif choice == "Lançamento de Notas":
     st.header("🧾 Escrituração Fiscal Dinâmica (Padrão Domínio)")
     with st.form("form_nota"):
@@ -168,24 +166,26 @@ elif choice == "Lançamento de Notas":
             acum_sel = st.selectbox("Acumulador Contábil", lista_a)
             valor_nf = st.number_input("Valor Bruto da Nota (R$)", min_value=0.0, step=10.0)
             regime = st.selectbox("Regime Tributário:", ["Simples Nacional", "Lucro Presumido"])
+        
         if st.form_submit_button("Processar e Gerar Lançamento Contábil"):
             if part_df.empty or acum_df.empty:
                 st.error("Erro: Cadastre um Participante e um Acumulador no menu 'Cadastros Base' antes de processar notas.")
             else:
-                id_p = int(participante_sel.split(" - ")[0])
+                id_p = int(participante_sel.split(" - "))
                 nome_p, conta_especifica_p = dict_part[id_p]
-                cod_ac = acum_sel.split(" - ")[0]
+                cod_ac = acum_sel.split(" - ")
                 config_ac = dict_acum[cod_ac]
                 c_debito, c_credito = config_ac['conta_debito'], config_ac['conta_credito']
+                cfop_associado = config_ac.get('cfop', '')
                 if c_debito in ["FORNECEDOR", "CLIENTE"]:
                     c_debito = conta_especifica_p if conta_especifica_p else ('4' if c_debito == "FORNECEDOR" else '3')
                 if c_credito in ["FORNECEDOR", "CLIENTE"]:
                     c_credito = conta_especifica_p if conta_especifica_p else ('4' if c_credito == "FORNECEDOR" else '3')
                 historico_final = f"Aquisição ref NF {num_nf}, Part: {nome_p}"
-                run_insert("diario", {"data": str(data_nf), "conta_debito": str(c_debito), "conta_credito": str(c_credito), "valor": valor_nf, "historico": historico_final, "origem": "Fiscal"})
+                run_insert("diario", {"data": str(data_nf), "conta_debito": str(c_debito), "conta_credito": str(c_credito), "valor": valor_nf, "historico": historico_final, "origem": "Fiscal", "acumulador": str(cod_ac), "cfop": str(cfop_associado), "participante": str(nome_p)})
                 imposto_calculado = valor_nf * float(config_ac['aliquota_imposto'])
                 if imposto_calculado > 0:
-                    run_insert("diario", {"data": str(data_nf), "conta_debito": "11", "conta_credito": "6", "valor": imposto_calculado, "historico": f"Provisão Imposto ref NF {num_nf}", "origem": "Imposto Nota"})
+                    run_insert("diario", {"data": str(data_nf), "conta_debito": "11", "conta_credito": "6", "valor": imposto_calculado, "historico": f"Provisão Imposto ref NF {num_nf}", "origem": "Imposto Nota", "acumulador": str(cod_ac), "cfop": str(cfop_associado), "participante": str(nome_p)})
                 st.success("Lançamento automático enviado ao diário!")
 
 elif choice == "Lançamento Manual":
@@ -202,7 +202,7 @@ elif choice == "Lançamento Manual":
         if st.form_submit_button("Gravar Lançamento Manual"):
             if contas_df.empty: st.error("Erro: Cadastre as contas contábeis primeiro.")
             else:
-                c_d_red = m_deb.split(" - ")[0]; c_c_red = m_cred.split(" - ")[0]
+                c_d_red = m_deb.split(" - "); c_c_red = m_cred.split(" - ")
                 if run_insert("diario", {"data": str(m_data), "conta_debito": c_d_red, "conta_credito": c_c_red, "valor": m_val, "historico": m_hist, "origem": "Manual"}):
                     st.success("Gravado com sucesso no Diário!")
 
@@ -222,7 +222,7 @@ elif choice == "Folha de Pagamento":
 elif choice == "Importação OFX (Banco)":
     st.header("🏦 Importador Real de Extratos Bancários (.OFX)")
     regras = {"TARIFA": ("9", "2", "Despesa Bancaria"), "TELEFONICA": ("9", "2", "Despesa com Telefone"), "MATERIAIS": ("9", "2", "Uso e Consumo")}
-    st.markdown("Regras de conciliação:")
+    st.markdown("**Regras de conciliação:**")
     st.json(regras)
     uploaded_file = st.file_uploader("Arraste e solte o seu arquivo .ofx aqui", type=["ofx"])
     if uploaded_file is not None:
@@ -250,59 +250,132 @@ elif choice == "Importação OFX (Banco)":
                             run_insert("diario", {"data": linha['Data'], "conta_debito": deb_f, "conta_credito": cred_f, "valor": linha['Valor'], "historico": f"OFX: {linha['Histórico OFX']}", "origem": "OFX"})
                             sucessos += 1; break
                 st.success(f"Conciliação concluída! {sucessos} lançamentos gerados.")
-
 elif choice == "Demonstrações Contábeis":
-    st.header("📋 Demonstrativos Oficiais (Padrão Normas Contábeis)")
+    st.header("📋 Demonstrativos Reais (Com Saldo Anterior e Filtro de Datas)")
     diario_completo = run_query("diario")
+    
+    col_dt1, col_dt2 = st.columns(2)
+    with col_dt1: dt_inicio = st.date_input("Data de Início do Período", date(2025, 1, 1))
+    with col_dt2: dt_fim = st.date_input("Data de Fim do Período", date(2025, 12, 31))
+    
     if diario_completo.empty or contas_df.empty:
-        st.warning("Efetue lançamentos e cadastre seu plano de contas para gerar os relatórios estruturados.")
+        st.warning("Cadastre as contas e faça lançamentos para visualizar os relatórios.")
     else:
         contas_df['codigo_estruturado'] = contas_df['codigo_estruturado'].str.strip()
         contas_sorted = contas_df.sort_values(by="codigo_estruturado").copy()
-        saldos_analiticos = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
-        deb_totais = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
-        cred_totais = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
-        for _, lanc in diario_completo.iterrows():
+        
+        # Filtros temporais baseados no Diário
+        diario_completo['data_dt'] = pd.to_datetime(diario_completo['data']).dt.date
+        df_anterior = diario_completo[diario_completo['data_dt'] < dt_inicio]
+        df_periodo = diario_completo[(diario_completo['data_dt'] >= dt_inicio) & (diario_completo['data_dt'] <= dt_fim)]
+        
+        # 1. PROCESSAMENTO DE SALDO ANTERIOR DINÂMICO
+        ant_deb = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
+        ant_cred = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
+        for _, lanc in df_anterior.iterrows():
             d, c, v = str(lanc['conta_debito']), str(lanc['conta_credito']), float(lanc['valor'])
-            if d in saldos_analiticos: saldos_analiticos[d] += v; deb_totais[d] += v
-            if c in saldos_analiticos: saldos_analiticos[c] -= v; cred_totais[c] += v
+            if d in ant_deb: ant_deb[d] += v
+            if c in ant_cred: ant_cred[c] += v
+            
+        # 2. PROCESSAMENTO DO PERÍODO SELECIONADO
+        per_deb = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
+        per_cred = {str(row['codigo_reduzido']): 0.0 for _, row in contas_sorted.iterrows()}
+        for _, lanc in df_periodo.iterrows():
+            d, c, v = str(lanc['conta_debito']), str(lanc['conta_credito']), float(lanc['valor'])
+            if d in per_deb: per_deb[d] += v
+            if c in per_cred: per_cred[c] += v
+
         linhas_balancete = []
         for _, row in contas_sorted.iterrows():
             mascara = row['codigo_estruturado']
             nome = row['nome']
             grupo_base = row['grupo']
-            s_deb = 0.0; s_cred = 0.0
+            
+            # Cálculo cascata de Níveis (Sintéticas acumulando as Analíticas)
+            sa_deb = 0.0; sa_cred = 0.0; sp_deb = 0.0; sp_cred = 0.0
             for _, r_sub in contas_sorted.iterrows():
                 if r_sub['codigo_estruturado'].startswith(mascara):
                     idx = str(r_sub['codigo_reduzido'])
-                    s_deb += deb_totais[idx]; s_cred += cred_totais[idx]
+                    sa_deb += ant_deb[idx]; sa_cred += ant_cred[idx]
+                    sp_deb += per_deb[idx]; sp_cred += per_cred[idx]
+            
+            # Lógica Contábil de Natureza de Saldos (Igual ao modelo Hardman)
             if grupo_base in ['Ativo', 'Despesa']:
-                saldo_atual = s_deb - s_cred
-                natureza = "D" if saldo_atual >= 0 else "C"
+                s_anterior = sa_deb - sa_cred
+                s_atual = (sa_deb + sp_deb) - (sa_cred + sp_cred)
+                nat_ant = "D" if s_anterior >= 0 else "C"
+                nat_at = "D" if s_atual >= 0 else "C"
             else:
-                saldo_atual = s_cred - s_deb
-                natureza = "C" if saldo_atual >= 0 else "D"
-            linhas_balancete.append({"Classificação": mascara, "Descrição da Conta": nome, "Débito": s_deb, "Crédito": s_cred, "Saldo Atual": f"R$ {abs(saldo_atual):,.2f} {natureza}", "_saldo_puro": saldo_atual, "_grupo": grupo_base})
+                s_anterior = sa_cred - sa_deb
+                s_atual = (sa_cred + sp_cred) - (sa_deb + sp_deb)
+                nat_ant = "C" if s_anterior >= 0 else "D"
+                nat_at = "C" if s_atual >= 0 else "D"
+                
+            linhas_balancete.append({
+                "Classificação / Máscara": mascara, "Descrição da Conta": nome,
+                "Saldo Anterior": f"R$ {abs(s_anterior):,.2f} {nat_ant}",
+                "Débito": sp_deb, "Crédito": sp_cred,
+                "Saldo Atual": f"R$ {abs(s_atual):,.2f} {nat_at}",
+                "_saldo_puro": s_atual, "_grupo": grupo_base
+            })
+            
         df_balancete_visual = pd.DataFrame(linhas_balancete)
-        tab_balancete, tab_dre, tab_balanco = st.tabs(["Balancete por Níveis", "DRE Dedutiva", "Balanço Patrimonial Vertical"])
+        tab_balancete, tab_dre, tab_balanco = st.tabs(["Balancete por Níveis", "DRE Oficial", "Balanço Patrimonial"])
+        
         with tab_balancete:
-            st.subheader("Balancete de Verificação Estruturado")
-            st.dataframe(df_balancete_visual[["Classificação", "Descrição da Conta", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True)
+            st.dataframe(df_balancete_visual[["Classificação / Máscara", "Descrição da Conta", "Saldo Anterior", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True)
         with tab_dre:
-            st.subheader("Demonstração do Resultado do Exercício (DRE)")
-            rec_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Receita' and '.' not in l['Classificação'])
-            des_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação'])
+            rec_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Receita' and '.' not in l['Classificação / Máscara'])
+            des_total = sum(l['_saldo_puro'] for l in linhas_balancete if l['_grupo'] == 'Despesa' and '.' not in l['Classificação / Máscara'])
             lucro_liquido = rec_total - des_total
             st.markdown(f"**(+) RECEITA OPERACIONAL BRUTA:** R$ {max(0, rec_total):,.2f}")
             st.markdown(f"**(-) DEDUÇÕES E IMPOSTOS INCIDENTES:** R$ {abs(min(0, rec_total)):,.2f}")
-            st.markdown(f"**(=) RECEITA LÍQUIDA:** R$ {rec_total:,.2f}")
+            st.markdown(f"**(=) RECEITA LÍQUIDA DO PERÍODO:** R$ {rec_total:,.2f}")
             st.markdown(f"**(-) DESPESAS ADMINISTRATIVAS / OPERACIONAIS:** R$ {des_total:,.2f}")
             st.markdown("---")
-            st.subheader(f"(=) RESULTADO LÍQUIDO DO EXERCÍCIO: R$ {lucro_liquido:,.2f}")
+            st.subheader(f"(=) RESULTADO LÍQUIDO NO PERÍODO: R$ {lucro_liquido:,.2f}")
         with tab_balanco:
-            st.subheader("Balanço Patrimonial Estruturado")
-            df_ativo = df_balancete_visual[df_balancete_visual['_grupo'] == 'Ativo'][["Classificação", "Descrição da Conta", "Saldo Atual"]]
-            df_passivo_pl = df_balancete_visual[df_balancete_visual['_grupo'].isin(['Passivo', 'PL'])][["Classificação", "Descrição da Conta", "Saldo Atual"]]
+            df_at = df_balancete_visual[df_balancete_visual['_grupo'] == 'Ativo'][["Classificação / Máscara", "Descrição da Conta", "Saldo Atual"]]
+            df_pa_pl = df_balancete_visual[df_balancete_visual['_grupo'].isin(['Passivo', 'PL'])][["Classificação / Máscara", "Descrição da Conta", "Saldo Atual"]]
             c1, c2 = st.columns(2)
-            with c1: st.info("**GRUPO 1 - ATIVO**"); st.write(df_ativo)
-            with c2: st.info("**GRUPO 2 - PASSIVO E PATRIMÔNIO LÍQUIDO**"); st.write(df_passivo_pl); st.markdown(f"*(+) Lucro do Exercício Corrente Incorporado: R$ {lucro_liquido:,.2f}*")
+            with c1: st.info("**GRUPO 1 - ATIVO**"); st.write(df_at)
+            with c2: st.info("**GRUPO 2 - PASSIVO E PL**"); st.write(df_pa_pl); st.markdown(f"*(+) Lucro Líquido Incorporado: R$ {lucro_liquido:,.2f}*")
+
+elif choice == "Central de Relatórios Fiscais/Gerenciais":
+    st.header("🔍 Central Multicritério de Relatórios")
+    diario_livro = run_query("diario")
+    
+    if diario_livro.empty: st.warning("Sem movimentações registradas.")
+    else:
+        diario_livro['data_dt'] = pd.to_datetime(diario_livro['data']).dt.date
+        col_f1, col_dt_i, col_dt_f = st.columns(3)
+        with col_dt_i: r_inicio = st.date_input("Início do Filtro", date(2025, 1, 1))
+        with col_dt_f: r_fim = st.date_input("Fim do Filtro", date(2025, 12, 31))
+        
+        df_filtrado = diario_livro[(diario_livro['data_dt'] >= r_inicio) & (diario_livro['data_dt'] <= r_fim)]
+        
+        col_f2, col_f3, col_f4 = st.columns(3)
+        with col_f2:
+            lista_ac_f = ["Todos"] + (list(df_filtrado['acumulador'].dropna().unique()) if 'acumulador' in df_filtrado.columns else [])
+            sel_acum = st.selectbox("Filtrar por Acumulador", lista_ac_f)
+        with col_f3:
+            lista_cf_f = ["Todos"] + (list(df_filtrado['cfop'].dropna().unique()) if 'cfop' in df_filtrado.columns else [])
+            sel_cfop = st.selectbox("Filtrar por CFOP", lista_cf_f)
+        with col_f4:
+            lista_part_f = ["Todos"] + (list(df_filtrado['participante'].dropna().unique()) if 'participante' in df_filtrado.columns else [])
+            sel_part = st.selectbox("Filtrar por Cliente / Fornecedor", lista_part_f)
+            
+        if sel_acum != "Todos": df_filtrado = df_filtrado[df_filtrado['acumulador'] == sel_acum]
+        if sel_cfop != "Todos": df_filtrado = df_filtrado[df_filtrado['cfop'] == sel_cfop]
+        if sel_part != "Todos": df_filtrado = df_filtrado[df_filtrado['participante'] == sel_part]
+        
+        t1, t2, tab_f = st.tabs(["Livro Diário / Lançamentos do Período", "Relatório de Livros Fiscais", "Resumo da Folha por Competência"])
+        with t1:
+            st.subheader("Lançamentos Contábeis Detalhados")
+            st.dataframe(df_filtrado[["data", "conta_debito", "conta_credito", "valor", "historico", "origem"]], use_container_width=True)
+        with t2:
+            st.subheader("Relatório Unificado de Entradas, Vendas e Serviços")
+            st.dataframe(df_filtrado[df_filtrado['origem'].isin(['Fiscal', 'Imposto Nota'])], use_container_width=True)
+        with tab_f:
+            st.subheader("Histórico de Custos com Departamento Pessoal")
+            st.dataframe(df_filtrado[df_filtrado['origem'] == 'Folha'], use_container_width=True)
