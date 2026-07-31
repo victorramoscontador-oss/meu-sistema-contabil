@@ -1,6 +1,5 @@
 import streamlit as str
 import pandas as pd
-from datetime import datetime
 from supabase import create_client, Client
 
 # Configuração da página (Primeiro comando Streamlit)
@@ -153,11 +152,10 @@ def buscar_plano_contas(empresa_id):
     ]
     if not supabase: return pd.DataFrame(dados_hardman)
     try:
-        resposta = supabase.table("plano_contas").select("codigo, descricao, tipo, nivel").eq("empresa_id", int(empresa_id)).execute()
+        resposta = supabase.table("plano_contas").select("codigo, descricao, tipo, nivel").eq("empresa_id", empresa_id).execute()
         return pd.DataFrame(resposta.data) if (resposta.data and len(resposta.data) > 0) else pd.DataFrame(dados_hardman)
     except Exception:
         return pd.DataFrame(dados_hardman)
-
 @str.cache_data(ttl=5)
 def buscar_participantes(empresa_id):
     dados_part = [
@@ -166,7 +164,7 @@ def buscar_participantes(empresa_id):
     ]
     if not supabase: return pd.DataFrame(dados_part)
     try:
-        resposta = supabase.table("participantes").select("id, nome, documento, tipo").eq("empresa_id", int(empresa_id)).execute()
+        resposta = supabase.table("participantes").select("id, nome, documento, tipo").eq("empresa_id", empresa_id).execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(dados_part)
     except Exception:
         return pd.DataFrame(dados_part)
@@ -176,7 +174,7 @@ def buscar_acumuladores(empresa_id):
     dados_acum = [{"id": 1, "operacao": "Rateio de Condomínio Geral", "aliquota": 0.0}]
     if not supabase: return pd.DataFrame(dados_acum)
     try:
-        resposta = supabase.table("acumuladores").select("id, operacao, aliquota").eq("empresa_id", int(empresa_id)).execute()
+        resposta = supabase.table("acumuladores").select("id, operacao, aliquota").eq("empresa_id", empresa_id).execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(dados_acum)
     except Exception:
         return pd.DataFrame(dados_acum)
@@ -186,7 +184,7 @@ def buscar_historicos(empresa_id):
     dados_hist = [{"id": 1, "descricao": "Arrecadação de cota condominial ordinária"}]
     if not supabase: return pd.DataFrame(dados_hist)
     try:
-        resposta = supabase.table("historicos_padrao").select("id, descricao").eq("empresa_id", int(empresa_id)).execute()
+        resposta = supabase.table("historicos_padrao").select("id, descricao").eq("empresa_id", empresa_id).execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(dados_hist)
     except Exception:
         return pd.DataFrame(dados_hist)
@@ -196,161 +194,95 @@ def buscar_regras_ofx(empresa_id):
     dados_ofx = [{"id": 1, "termo_chave": "COELBA", "conta_id": "4.3.3.04.0009"}]
     if not supabase: return pd.DataFrame(dados_ofx)
     try:
-        resposta = supabase.table("regras_ofx").select("id, termo_chave, conta_id").eq("empresa_id", int(empresa_id)).execute()
+        resposta = supabase.table("regras_ofx").select("id, termo_chave, conta_id").eq("empresa_id", empresa_id).execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(dados_ofx)
     except Exception:
         return pd.DataFrame(dados_ofx)
-# ==============================================================================
-# MÓDULOS DE RENDERIZAÇÃO DA INTERFACE
-# ==============================================================================
-
 def renderizar_modulo_lancamentos(empresa_id):
     str.header("Escrituração Contábil Manual")
-    str.subheader("Insira os dados do lançamento")
     
     df_contas = buscar_plano_contas(empresa_id)
     df_historicos = buscar_historicos(empresa_id)
-    df_participantes = buscar_participantes(empresa_id)
     
     opcoes_contas = [f"{row['codigo']} - {row['descricao']}" for _, row in df_contas.iterrows()]
     opcoes_hist = [f"{row['id']} - {row['descricao']}" for _, row in df_historicos.iterrows()]
-    opcoes_part = [f"{row['nome']} ({row['documento']})" for _, row in df_participantes.iterrows()]
     
-    with str.form("formulario_lancamento"):
-        col1, col2 = str.columns(2)
-        with col1:
-            data_lan = str.date_input("Data do Lançamento", datetime.today())
-            c_debito = str.selectbox("Conta de Débito (Aplicação)", options=opcoes_contas)
-            c_credito = str.selectbox("Conta de Crédito (Origem)", options=opcoes_contas)
-        with col2:
-            valor_lan = str.number_input("Valor do Lançamento (R$)", min_value=0.01, step=0.01, format="%.2f")
-            historic = str.selectbox("Histórico Padrão", options=opcoes_hist)
-            complemento = str.text_input("Complemento do Histórico", placeholder="Ex: Ref. mês corrente")
-            
-        participante = str.selectbox("Participante (Opcional)", options=["Nenhum"] + opcoes_part)
-        botao_gravar = str.form_submit_button("Gravar Lançamento")
-        
-        if botao_gravar:
-            # FIX CRÍTICO: Conversão explícita do objeto datetime do Streamlit para string ANSI aceita no Supabase
-            data_formatada = data_lan.strftime("%Y-%m-%d")
-            
-            codigo_debito = c_debito.split(" - ")[0]
-            codigo_credito = c_credito.split(" - ")[0]
-            id_historico = int(historic.split(" - ")[0])
-            
-            payload = {
-                "empresa_id": int(empresa_id),
-                "data": data_formatada,
-                "conta_debito": str(codigo_debito),
-                "conta_credito": str(codigo_credito),
-                "valor": float(valor_lan),
-                "historico_id": id_historico,
-                "complemento": str(complemento),
-                "participante": str(participante if participante != "Nenhum" else "")
-            }
-            
-            if not supabase:
-                str.warning("Banco em modo Simulação. Lançamento estruturado com sucesso no Payload local!")
-                str.json(payload)
-            else:
-                try:
-                    supabase.table("lancamentos").insert(payload).execute()
-                    str.success("🎯 Lançamento contábil registrado com sucesso!")
-                    str.rerun()
-                except Exception as e:
-                    str.error(f"Erro ao salvar registro no banco de dados: {e}")
+    data_lan = str.date_input("Data do Lançamento")
+    c_debito = str.selectbox("Conta de Débito (Aplicação)", options=opcoes_contas)
+    c_credito = str.selectbox("Conta de Crédito (Origem)", options=opcoes_contas)
+    valor_lan = str.number_input("Valor do Lançamento", min_value=0.0)
+    historic = str.selectbox("Histórico Padrão", options=opcoes_hist)
+    
+    if str.button("Gravar Lançamento"):
+        # CORREÇÃO DO ERRO: Transforma o objeto de data em texto padrão (AAAA-MM-DD) esperado pelo banco
+        payload = {
+            "data": data_lan.strftime("%Y-%m-%d"), 
+            "conta_debito": c_debito, 
+            "conta_credito": c_credito, 
+            "valor": valor_lan, 
+            "historico": historic
+        }
+        try:
+            supabase.table("lancamentos").insert(payload).execute()
+            str.success("Lançamento gravado com sucesso!")
+        except Exception as e:
+            str.error(f"Erro ao gravar: {e}")
 def renderizar_modulo_cadastros(empresa_id):
     str.header("Cadastros Estruturais")
-    aba1, aba2, aba3 = str.tabs(["Plano de Contas", "Participantes", "Históricos Padrão"])
-    
-    with aba1:
-        str.subheader("Plano de Contas Ativo")
-        str.dataframe(buscar_plano_contas(empresa_id), use_container_width=True)
-    with aba2:
-        str.subheader("Clientes e Fornecedores")
-        str.dataframe(buscar_participantes(empresa_id), use_container_width=True)
-    with aba3:
-        str.subheader("Lista de Históricos Parametrizados")
-        str.dataframe(buscar_historicos(empresa_id), use_container_width=True)
+    str.dataframe(buscar_plano_contas(empresa_id))
 
-def renderizar_modulo_demonstracoes(empresa_id, nome_empresa):
+def renderizar_modulo_demonstracoes(empresa_id):
     str.header("Demonstrações Oficiais")
     
-    # Início da Área de Impressão (Capturada pelo CSS print)
+    # Aplica a div de impressão que você criou no CSS original
     str.markdown('<div class="print-area">', unsafe_allow_html=True)
-    
-    str.title(f"Balancete de Verificação")
-    str.caption(f"Empresa: {nome_empresa} | Emissão: {datetime.today().strftime('%d/%m/%Y')}")
-    
-    df_contas = buscar_plano_contas(empresa_id)
-    df_balancete = df_contas.copy()
-    df_balancete["Saldo Anterior"] = [150000.00 if x == 1 else 0.0 for x in df_balancete["nivel"]]
-    df_balancete["Débito"] = [2500.00 if x == 5 else 0.0 for x in df_balancete["nivel"]]
-    df_balancete["Crédito"] = [1200.00 if x == 5 else 0.0 for x in df_balancete["nivel"]]
-    df_balancete["Saldo Atual"] = df_balancete["Saldo Anterior"] + df_balancete["Débito"] - df_balancete["Crédito"]
-    
-    str.dataframe(df_balancete, use_container_width=True, hide_index=True)
-    
+    str.write("### Balancete de Verificação")
+    str.dataframe(buscar_plano_contas(empresa_id))
     str.markdown('</div>', unsafe_allow_html=True)
-    str.write("---")
     
-    # FIX CRÍTICO DO PDF: Integração nativa com a janela de impressão da máquina do usuário
-    botao_javascript_pdf = """
+    # CORREÇÃO DO PDF: Substituição do botão que não funcionava por execução JavaScript nativa do navegador
+    botao_pdf = """
     <script>
-    function executarImpressao() {
+    function dispararImpressao() {
         window.print();
     }
     </script>
-    <button onclick="executarImpressao()" style="
+    <button onclick="dispararImpressao()" style="
         background-color: #00ff66;
         color: #0b2216;
         font-weight: bold;
         border-radius: 6px;
         border: none;
-        padding: 12px 24px;
+        padding: 10px 20px;
         cursor: pointer;
         font-size: 16px;
-        box-shadow: 0px 4px 10px rgba(0, 255, 102, 0.3);
-        transition: 0.2s;
-    ">🖨️ Gerar Relatório Contábil (Salvar em PDF)</button>
+    ">🖨️ Gerar Relatório (Salvar em PDF)</button>
     """
-    str.components.v1.html(botao_javascript_pdf, height=60)
+    str.components.v1.html(botao_pdf, height=60)
+
 def main():
-    # Inicialização visual da Barra Lateral
     str.sidebar.markdown('<span class="logo-texto">>><<</span>', unsafe_allow_html=True)
     str.sidebar.title("Fluxo Assessoria")
     str.sidebar.caption("Assessoria Empresarial de Alta Performance")
-    str.sidebar.write("---")
     
     df_empresas = buscar_empresas_contabilidade()
-    lista_empresas = [f"{row['id']} - {row['razao_social']}" for _, row in df_empresas.iterrows()]
+    empresas = [row['razao_social'] for _, row in df_empresas.iterrows()]
+    empresa_ativa = str.sidebar.selectbox("Selecione o Cliente Contábil", empresas)
+    empresa_id = df_empresas[df_empresas['razao_social'] == empresa_ativa]['id'].values[0]
     
-    empresa_selecionada = str.sidebar.selectbox("📊 Selecione o Cliente Contábil", options=lista_empresas)
-    id_empresa_ativa = int(empresa_selecionada.split(" - ")[0])
-    nome_empresa_ativa = empresa_selecionada.split(" - ")[1]
+    str.sidebar.markdown("### Navegação")
+    opcao = str.sidebar.radio("Ir para", ["Escrituração Contábil", "Cadastros Estruturais", "Demonstrações Oficiais"])
     
-    str.sidebar.write("---")
-    str.sidebar.markdown("**Navegação**")
-    
-    # Controle centralizado dos módulos de tela
-    modulo = str.sidebar.radio(
-        "Menus Disponíveis",
-        ["🔴 Escrituração Contábil", "⚫ Cadastros Estruturais", "⚪ Demonstrações Oficiais"],
-        label_visibility="collapsed"
-    )
-    
-    str.sidebar.write("---")
-    if str.sidebar.button("Encerrar Sessão / Logout", use_container_width=True):
+    if str.sidebar.button("Encerra Sessão / Logout"):
         str.session_state['autenticado'] = False
         str.rerun()
         
-    # Roteamento definitivo
-    if "Escrituração Contábil" in modulo:
-        renderizar_modulo_lancamentos(id_empresa_ativa)
-    elif "Cadastros Estruturais" in modulo:
-        renderizar_modulo_cadastros(id_empresa_ativa)
-    elif "Demonstrações Oficiais" in modulo:
-        renderizar_modulo_demonstracoes(id_empresa_ativa, nome_empresa_ativa)
+    if opcao == "Escrituração Contábil":
+        renderizar_modulo_lancamentos(empresa_id)
+    elif opcao == "Cadastros Estruturais":
+        renderizar_modulo_cadastros(empresa_id)
+    elif opcao == "Demonstrações Oficiais":
+        renderizar_modulo_demonstracoes(empresa_id)
 
 if __name__ == "__main__":
     main()
