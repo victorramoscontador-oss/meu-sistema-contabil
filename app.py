@@ -247,11 +247,13 @@ def renderizar_modulo_lancamentos(empresa_id):
     
     aba1, aba2, aba3 = str.tabs(["Lançamento Manual", "Importação de Notas Fiscais", "Conciliação OFX Real"])
     
+    # Função unificada de mapeamento para exibir Código + Nome em formato legível
     def formatar_opcao_conta(codigo):
         if not codigo or df_plano.empty:
             return ""
         linha = df_plano[df_plano['codigo'] == codigo]
         if not linha.empty:
+            # Retorna string contendo o identificador numérico associado à descrição amigável
             return f"{codigo} - {linha['descricao'].values[0]}"
         return codigo
 
@@ -357,7 +359,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
         if not df_balancete.empty:
             def obter_saldo(prefixo):
                 filtro = df_balancete[df_balancete['Código'].str.startswith(prefixo) & (df_balancete['Nível'] == 1)]
-                return float(filtro['Saldo Atual'].values[0]) if (not filtro.empty and len(filtro['Saldo Atual'].values) > 0) else 0.0
+                return float(filtro['Saldo Atual'].values) if (not filtro.empty and len(filtro['Saldo Atual'].values) > 0) else 0.0
             
             rec_bruta = obter_saldo("3")
             deducoes = obter_saldo("3.2")
@@ -395,8 +397,18 @@ def renderizar_modulo_cadastros(empresa_id):
         "Empresas", "Contas Contábeis", "Clientes/Fornecedores", "Acumuladores Fiscais", "Históricos Padrão", "Regras OFX"
     ])
     
+    # Função espelho interna para garantir a formatação de nomes na aba de regras OFX
+    df_plano = buscar_plano_contas(empresa_id)
+    def formatar_opcao_conta_interna(codigo):
+        if not codigo or df_plano.empty:
+            return ""
+        linha = df_plano[df_plano['codigo'] == codigo]
+        if not linha.empty:
+            return f"{codigo} - {linha['descricao'].values[0]}"
+        return codigo
+
     with aba_emp:
-        str.subheader("Carteira de Empresas Cliente")
+        str.subheader("Cadastro de Empresas Clientes")
         df_e = buscar_empresas_contabilidade()
         str.dataframe(df_e, use_container_width=True, hide_index=True)
         with str.form("form_emp", clear_on_submit=True):
@@ -410,8 +422,7 @@ def renderizar_modulo_cadastros(empresa_id):
 
     with aba_contas:
         str.subheader("Plano de Contas Vinculado")
-        df_p = buscar_plano_contas(empresa_id)
-        str.dataframe(df_p, use_container_width=True, hide_index=True)
+        str.dataframe(df_plano, use_container_width=True, hide_index=True)
         with str.form("form_conta", clear_on_submit=True):
             c_cod = str.text_input("Código")
             c_des = str.text_input("Descrição")
@@ -466,13 +477,13 @@ def renderizar_modulo_cadastros(empresa_id):
         df_rx = buscar_regras_ofx(empresa_id)
         str.dataframe(df_rx, use_container_width=True, hide_index=True)
         
-        df_plano = buscar_plano_contas(empresa_id)
         lista_contas = df_plano['codigo'].tolist() if not df_plano.empty else [""]
         
         with str.form("form_nova_regra_ofx", clear_on_submit=True):
             palabra = str.text_input("Palavra-Chave Contida no Extrato (Ex: PIX RECEB, ENERGIA)")
-            d_c = str.selectbox("Conta de Débito Vinculada", options=lista_contas)
-            c_c = str.selectbox("Conta de Crédito Vinculada", options=lista_contas)
+            # Correção aplicada: dropdowns agora exibem o nome das contas amigavelmente
+            d_c = str.selectbox("Conta de Débito Vinculada", options=lista_contas, format_func=formatar_opcao_conta_interna)
+            c_c = str.selectbox("Conta de Crédito Vinculada", options=lista_contas, format_func=formatar_opcao_conta_interna)
             
             if str.form_submit_button("Salvar Regra de Automação") and supabase:
                 payload_r = {"palavra_chave": palabra, "conta_debito": d_c, "conta_credito": c_c, "empresa_id": empresa_id}
@@ -493,7 +504,7 @@ def main():
     
     if not df_empresas.empty and emp_selecionada_nome != "Nenhuma cadastrada":
         id_filtrado = df_empresas[df_empresas['razao_social'] == emp_selecionada_nome]['id'].values
-        empresa_id_ativa = int(id_filtrado[0]) if len(id_filtrado) > 0 else 1
+        empresa_id_ativa = int(id_filtrado) if len(id_filtrado) > 0 else 1
     else:
         empresa_id_ativa = 1
         
