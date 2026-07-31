@@ -512,12 +512,12 @@ def main():
         str.session_state['autenticado'] = False
         str.rerun()
 
-   if opcao_menu == "Escrituração Contábil":
-    renderizar_modulo_lancamentos(empresa_id_ativa)
-elif opcao_menu == "Cadastros Estruturais":
-    renderizar_modulo_cadastros(empresa_id_ativa)  #  Corrigido aqui
-elif opcao_menu == "Demonstrações Oficiais":
-    renderizar_demonstracoes(empresa_id_ativa, emp_selecionada_nome)
+      if opcao_menu == "Escrituração Contábil":
+        renderizar_modulo_lancamentos(empresa_id_ativa)
+    elif opcao_menu == "Cadastros Estruturais":
+        renderizar_modulo_cadastros(empresa_id_ativa)
+    elif opcao_menu == "Demonstrações Oficiais":
+        renderizar_demonstracoes(empresa_id_ativa, emp_selecionada_nome)
 
 if __name__ == "__main__":
     main()
