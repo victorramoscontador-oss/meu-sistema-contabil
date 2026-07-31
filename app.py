@@ -11,6 +11,7 @@ str.set_page_config(
 )
 
 # Constantes de Conexão e Segurança
+# DICA: Substitua a URL abaixo pela URL real do seu projeto do Supabase para sumir o erro!
 SUPABASE_URL = "https://supabase.co"
 SUPABASE_KEY = "sb_publishable_4OAD9stwBHF-L-eMaZkrFg_wRGMplWa"
 USUARIO_CORRETO = "contador"
@@ -22,12 +23,12 @@ def inicializar_supabase() -> Client:
     try:
         return create_client(SUPABASE_URL, SUPABASE_KEY)
     except Exception as e:
-        str.error(f"Erro crítico de conexão com o banco de dados: {e}")
+        str.error("Erro crítico de conexão: Verifique a URL do Supabase.")
         return None
 
 supabase = inicializar_supabase()
 
-# Injeção de Identidade Visual via CSS
+# Injeção de Identidade Visual via CSS (Legendas e Menu Lateral em Branco)
 str.markdown("""
     <style>
     @import url('https://googleapis.com');
@@ -35,7 +36,19 @@ str.markdown("""
         font-family: 'Roboto', 'Segoe UI', sans-serif;
     }
     .stApp { background-color: #f8f9fa; }
+    
+    /* Menu Lateral */
     [data-testid="stSidebar"] { background-color: #0b2216; color: #ffffff; }
+    
+    /* Forçar a cor branca em todos os textos, legendas e botões de rádio do menu lateral */
+    [data-testid="stSidebar"] p, 
+    [data-testid="stSidebar"] small, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] span { 
+        color: #ffffff !important; 
+    }
+    
+    /* Estilização do Botão */
     .stButton>button {
         background-color: #00ff66 !important;
         color: #0b2216 !important;
@@ -48,13 +61,16 @@ str.markdown("""
         background-color: #00cc52 !important;
         box-shadow: 0 0 10px #00ff66;
     }
+    
+    /* Logotipo Ajustado (>><< Junto e Fonte Maior) */
     .logo-texto {
-        font-size: 28px;
+        font-size: 38px;
         font-weight: bold;
         color: #00ff66;
         font-family: monospace;
-        letter-spacing: 2px;
-        margin-bottom: 20px;
+        letter-spacing: -2px;
+        margin-bottom: 5px;
+        padding-top: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -75,7 +91,6 @@ if not str.session_state['autenticado']:
             usuario_limpo = usuario.strip()
             senha_limpa = senha.strip()
             
-            # Validação direta e blindada contra erros de criptografia
             if usuario_limpo == USUARIO_CORRETO and senha_limpa == SENHA_CORRETA:
                 str.session_state['autenticado'] = True
                 str.rerun()
@@ -83,7 +98,7 @@ if not str.session_state['autenticado']:
                 str.error("Usuário ou senha inválidos.")
     str.stop()
 # ==============================================================================
-# CAMADA DE DADOS OTIMIZADA (PREVENÇÃO DE TELA BRANCA)
+# CAMADA DE DADOS OTIMIZADA (PROTEÇÃO CONTRA ERROS LONGOS)
 # ==============================================================================
 
 @str.cache_data(ttl=60)
@@ -92,7 +107,8 @@ def buscar_plano_contas():
         resposta = supabase.table("plano_contas").select("codigo, descricao, tipo, nivel, superior").execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(columns=["codigo", "descricao", "tipo", "nivel", "superior"])
     except Exception as e:
-        str.warning(f"Erro ao ler plano de contas: {e}")
+        # Exibe apenas uma mensagem curta e limpa na tela se a URL estiver errada
+        str.warning("Aviso: Não foi possível ler o Plano de Contas. Verifique se a URL do Supabase do seu projeto está correta.")
         return pd.DataFrame(columns=["codigo", "descricao", "tipo", "nivel", "superior"])
 
 @str.cache_data(ttl=60)
@@ -101,7 +117,6 @@ def buscar_participantes():
         resposta = supabase.table("participantes").select("id, nome, documento").execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(columns=["id", "nome", "documento"])
     except Exception as e:
-        str.warning(f"Erro ao ler participantes: {e}")
         return pd.DataFrame(columns=["id", "nome", "documento"])
 
 @str.cache_data(ttl=60)
@@ -110,7 +125,6 @@ def buscar_acumuladores():
         resposta = supabase.table("acumuladores").select("id, operacao, aliquota").execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(columns=["id", "operacao", "aliquota"])
     except Exception as e:
-        str.warning(f"Erro ao ler acumuladores: {e}")
         return pd.DataFrame(columns=["id", "operacao", "aliquota"])
 
 @str.cache_data(ttl=30)
@@ -121,7 +135,6 @@ def buscar_lancamentos(data_inicio, data_fim):
             .lte("data", data_fim.strftime('%Y-%m-%d')).execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(columns=["id", "data", "conta_debito", "conta_credito", "valor", "historico"])
     except Exception as e:
-        str.error(f"Erro ao recuperar lançamentos do período: {e}")
         return pd.DataFrame(columns=["id", "data", "conta_debito", "conta_credito", "valor", "historico"])
 
 def processar_balancete_df(df_lancamentos, df_plano, data_limite):
@@ -180,10 +193,10 @@ def renderizar_modulo_lancamentos():
     df_acum = buscar_acumuladores()
     
     # 1. LANÇAMENTO MANUAL
-    with abas_operacionais[0]:
+    with abas_operacionais:
         str.subheader("Lançamento Partida Dobrada")
         if df_plano.empty:
-            str.warning("Plano de contas vazio ou indisponível para lançamentos.")
+            str.warning("Plano de contas indisponível ou vazio. Verifique a conexão com a base de dados.")
         else:
             with str.form("form_manual", clear_on_submit=True):
                 col1, col2, col3 = str.columns(3)
@@ -206,7 +219,7 @@ def renderizar_modulo_lancamentos():
                         str.cache_data.clear()
 
     # 2. LANÇAMENTO DE NOTAS FISCAIS
-    with abas_operacionais[1]:
+    with abas_operacionais:
         str.subheader("Escrituração Manual de Notas Fiscais")
         with str.form("form_nota", clear_on_submit=True):
             col1, col2, col3 = str.columns(3)
@@ -229,10 +242,10 @@ def renderizar_modulo_lancamentos():
                     str.success("Nota fiscal integrada ao diário com sucesso!")
                     str.cache_data.clear()
                 else:
-                    str.error("Plano de contas vazio.")
+                    str.error("Base de dados ausente.")
 
     # 3. FOLHA DE PAGAMENTO
-    with abas_operacionais[2]:
+    with abas_operacionais:
         str.subheader("Provisão de Folha de Pagamento")
         with str.form("form_folha"):
             salarios_brutos = str.number_input("Total Salários Brutos (R$)", min_value=0.0)
@@ -243,7 +256,7 @@ def renderizar_modulo_lancamentos():
                 str.success("Folha provisionada com sucesso no diário contábil!")
 
     # 4. CONCILIAÇÃO OFX REAL
-    with abas_operacionais[3]:
+    with abas_operacionais:
         str.subheader("Processador de Extratos Bancários OFX")
         arquivo_ofx = str.file_uploader("Selecione o arquivo .ofx do Banco do Cliente", type=["ofx"])
         if arquivo_ofx is not None:
@@ -274,7 +287,7 @@ def renderizar_demonstracoes():
     sub_abas = str.tabs(["Balancete por Níveis", "DRE Dedutiva Oficial", "Balanço Patrimonial Vertical"])
     
     # 1. BALANCETE POR NÍVEIS
-    with sub_abas[0]:
+    with sub_abas:
         str.subheader("Balancete de Verificação Analítico")
         nivel_sel = str.slider("Filtrar por Nível do Plano de Contas", 1, 5, 5)
         
@@ -282,7 +295,7 @@ def renderizar_demonstracoes():
         str.dataframe(df_balancete_filtrado[["Código", "Descrição", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True, hide_index=True)
 
     # 2. DRE DEDUTIVA OFICIAL
-    with sub_abas[1]:
+    with sub_abas:
         str.subheader("Demonstração do Resultado do Exercício Dedutiva")
         
         def obter_saldo_por_prefixo(prefixo):
@@ -312,7 +325,7 @@ def renderizar_demonstracoes():
         """, unsafe_allow_html=True)
 
     # 3. BALANÇO PATRIMONIAL VERTICAL
-    with sub_abas[2]:
+    with sub_abas:
         str.subheader("Balanço Patrimonial Estruturado Vertical")
         df_balanco = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy()
         if not df_balanco.empty:
@@ -321,7 +334,7 @@ def renderizar_demonstracoes():
             str.info("Sem dados patrimoniais suficientes para estruturar o Balanço no período selecionado.")
 
 def main():
-    str.sidebar.markdown('<div class="logo-texto">&gt;&gt; &lt;&lt;</div>', unsafe_allow_html=True)
+    str.sidebar.markdown('<div class="logo-texto">&gt;&gt;&lt;&lt;</div>', unsafe_allow_html=True)
     str.sidebar.title("Fluxo Assessoria")
     str.sidebar.caption("Assessoria Financeira de Alta Performance")
     str.sidebar.markdown("---")
