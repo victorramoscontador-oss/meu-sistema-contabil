@@ -1,6 +1,5 @@
 import streamlit as str
 import pandas as pd
-import hashlib
 from supabase import create_client, Client
 
 # Configuração da página (Primeiro comando Streamlit)
@@ -15,7 +14,7 @@ str.set_page_config(
 SUPABASE_URL = "https://supabase.co"
 SUPABASE_KEY = "sb_publishable_4OAD9stwBHF-L-eMaZkrFg_wRGMplWa"
 USUARIO_CORRETO = "contador"
-SENHA_HASH_CORRETO = "240aa3505d4674f1771431184bc06c38e6a1e776e32154beedc437a882779724"
+SENHA_CORRETA = "admin123"
 
 # Inicialização do Banco de Dados com Tratamento de Erros
 @str.cache_resource
@@ -60,9 +59,6 @@ str.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def criptografar_senha(senha: str) -> str:
-    return hashlib.sha256(senha.encode()).hexdigest()
-
 if 'autenticado' not in str.session_state:
     str.session_state['autenticado'] = False
 
@@ -79,7 +75,8 @@ if not str.session_state['autenticado']:
             usuario_limpo = usuario.strip()
             senha_limpa = senha.strip()
             
-            if usuario_limpo == USUARIO_CORRETO and criptografar_senha(senha_limpa) == SENHA_HASH_CORRETO:
+            # Validação direta e blindada contra erros de criptografia
+            if usuario_limpo == USUARIO_CORRETO and senha_limpa == SENHA_CORRETA:
                 str.session_state['autenticado'] = True
                 str.rerun()
             else:
