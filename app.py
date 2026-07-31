@@ -91,8 +91,7 @@ str.markdown("""
         } 
     } 
     </style> 
-""", unsafe_allow_html=True) 
-
+""", unsafe_allow_html=True)
 if 'autenticado' not in str.session_state: 
     str.session_state['autenticado'] = False 
 
@@ -112,6 +111,7 @@ if not str.session_state['autenticado']:
             else: 
                 str.error("Usuário ou senha inválidos.") 
                 str.stop()
+
 # ============================================================================== 
 # CAMADA DE DADOS E CARGA DE CONTAS BASEADA NO BALANCETE REAL DO HARDMAN FLAT 
 # ============================================================================== 
@@ -151,8 +151,7 @@ def buscar_plano_contas(empresa_id):
         resposta = supabase.table("plano_contas").select("codigo, descricao, tipo, nivel").eq("empresa_id", empresa_id).execute() 
         return pd.DataFrame(resposta.data) if (resposta.data and len(resposta.data) > 0) else pd.DataFrame(dados_hardman) 
     except Exception: 
-        return pd.DataFrame(dados_hardman) 
-
+        return pd.DataFrame(dados_hardman)
 @str.cache_data(ttl=5) 
 def buscar_participantes(empresa_id): 
     dados_part = [ 
@@ -281,7 +280,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             if str.form_submit_button("Processar e Escriturar Nota") and supabase: 
                 payload_nota = {"data": "2026-07-31", "conta_debito": c_despesa, "conta_credito": c_origem, "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
                 supabase.table("lancamentos").insert(payload_nota).execute() 
-                str.success(f"Nota Fiscal {num_nota} integrada ao diário contábil!") 
+                str.success(f"Nota Fiscal {num_nota} integrated ao diário contábil!") 
                 str.cache_data.clear() 
 
     with aba3: 
@@ -307,8 +306,7 @@ def renderizar_modulo_lancamentos(empresa_id):
                         payload_ofx = {"data": row['Data'], "conta_debito": deb_puro, "conta_credito": cred_puro, "valor": float(row['Valor']), "historico": f"OFX Auto: {row['Documento']}", "empresa_id": empresa_id} 
                         supabase.table("lancamentos").insert(payload_ofx).execute() 
                 str.success("Transações mapeadas gravadas!") 
-                str.cache_data.clear() 
-
+                str.cache_data.clear()
 def renderizar_demonstracoes(empresa_id, nome_empresa): 
     str.header("Demonstrações e Relatórios Contábeis Oficiais") 
     col1, col2 = str.columns(2) 
@@ -354,23 +352,26 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
             | (-) Despesas Administrativas, Gerais e Operacionais | ({despesas:,.2f}) | 
             | **(=) RESULTADO LÍQUIDO DO EXERCÍCIO (RLE)** | **{lucro_liquido:,.2f}** | 
             """) 
-        else: str.info("Sem movimentações de contas de resultado registradas no diário.") 
+        else: 
+            str.info("Sem movimentações de contas de resultado registradas no diário.") 
         
     with aba_rep3: 
         str.subheader("Balanço Patrimonial Vertical") 
         if not df_balancete.empty: 
-            df_patrimonio = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy() 
+            df_patrimonio = df_balancete[df_patrimonio['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy() 
             str.dataframe(df_patrimonio[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True) 
-        else: str.info("Aguardando consolidação de lançamentos patrimoniais.") 
-
+        else: 
+            str.info("Aguardando consolidação de lançamentos patrimoniais.")
 def renderizar_modulo_cadastros(empresa_id): 
     str.header("Painel de Cadastros Estruturais") 
-    aba_emp, aba_contas, aba_part, aba_acum, aba_hist, aba_ofx = str.tabs(["Empresas", "Contas Contábeis", "Clientes/Fornecedores", "Acumuladores Fiscais", "Históricos Padrão", "Regras OFX"]) 
-    df_plano = buscar_plano_contas(empresa_id) 
+    aba_emp, aba_contas, aba_part, aba_acum, aba_hist, aba_ofx = str.tabs([ 
+        "Empresas", "Contas Contábeis", "Clientes/Fornecedores", "Acumuladores Fiscais", "Históricos Padrão", "Regras OFX" 
+    ]) 
     
+    df_plano = buscar_plano_contas(empresa_id) 
     def formatar_opcao_conta_interna(codigo): 
         if not codigo or df_plano.empty: return "" 
-        linha = df_plano[df_plano['codigo'] == codigo] 
+        linha = df_plano[df_plano['codigo'] == code] 
         return f"{codigo} - {linha['descricao'].values[0]}" if not linha.empty else codigo 
 
     with aba_emp: 
@@ -378,3 +379,111 @@ def renderizar_modulo_cadastros(empresa_id):
         df_e = buscar_empresas_contabilidade() 
         str.dataframe(df_e, use_container_width=True, hide_index=True) 
         with str.form("form_emp", clear_on_submit=True): 
+            rz = str.text_input("Razão Social") 
+            cn = str.text_input("CNPJ") 
+            if str.form_submit_button("Salvar Empresa") and supabase: 
+                supabase.table("empresas_clientes").insert({"razao_social": rz, "cnpj": cn}).execute() 
+                str.success("Empresa cadastrada!") 
+                str.cache_data.clear() 
+                str.rerun() 
+
+    with aba_contas: 
+        str.subheader("Plano de Contas Vinculado") 
+        str.dataframe(df_plano, use_container_width=True, hide_index=True) 
+        with str.form("form_conta", clear_on_submit=True): 
+            c_cod = str.text_input("Código") 
+            c_des = str.text_input("Descrição") 
+            c_tp = str.selectbox("Tipo", ["Ativo", "Passivo", "Patrimônio Líquido", "Receita", "Despesa"]) 
+            if str.form_submit_button("Salvar Conta") and supabase: 
+                supabase.table("plano_contas").insert({"codigo": c_cod, "descricao": c_des, "tipo": c_tp, "nivel": 5, "empresa_id": empresa_id}).execute() 
+                str.success("Conta salva!") 
+                str.cache_data.clear() 
+                str.rerun() 
+
+    with aba_part: 
+        str.subheader("Clientes e Fornecedores") 
+        df_pt = buscar_participantes(empresa_id) 
+        str.dataframe(df_pt, use_container_width=True, hide_index=True) 
+        with str.form("form_part", clear_on_submit=True): 
+            p_nom = str.text_input("Nome") 
+            p_doc = str.text_input("CPF/CNPJ") 
+            p_tp = str.selectbox("Tipo", ["Fornecedor", "Cliente"]) 
+            if str.form_submit_button("Salvar Participante") and supabase: 
+                supabase.table("participantes").insert({"nome": p_nom, "documento": p_doc, "tipo": p_tp, "empresa_id": empresa_id}).execute() 
+                str.success("Participante salvo!") 
+                str.cache_data.clear() 
+                str.rerun() 
+
+    with aba_acum: 
+        str.subheader("Acumuladores / Operações Fiscais") 
+        df_ac = buscar_acumuladores(empresa_id) 
+        str.dataframe(df_ac, use_container_width=True, hide_index=True) 
+        with str.form("form_acum", clear_on_submit=True): 
+            a_op = str.text_input("Nome da Operação") 
+            a_al = str.number_input("Alíquota (%)", min_value=0.0) 
+            if str.form_submit_button("Salvar Acumulador") and supabase: 
+                supabase.table("acumuladores").insert({"operacao": a_op, "aliquota": a_al, "empresa_id": empresa_id}).execute() 
+                str.success("Acumulador cadastrado!") 
+                str.cache_data.clear() 
+                str.rerun() 
+
+    with aba_hist: 
+        str.subheader("Históricos Contábeis Padrão") 
+        df_hs = buscar_historicos(empresa_id) 
+        str.dataframe(df_hs, use_container_width=True, hide_index=True) 
+        with str.form("form_hist", clear_on_submit=True): 
+            h_ds = str.text_input("Texto do Histórico") 
+            if str.form_submit_button("Salvar Histórico") and supabase: 
+                supabase.table("historicos_padrao").insert({"descricao": h_ds, "empresa_id": empresa_id}).execute() 
+                str.success("Histórico salvo!") 
+                str.cache_data.clear() 
+                str.rerun() 
+
+    with aba_ofx: 
+        str.subheader("Mapeamento Contábil de Extratos OFX") 
+        df_rx = buscar_regras_ofx(empresa_id) 
+        str.dataframe(df_rx, use_container_width=True, hide_index=True) 
+        lista_contas = df_plano['codigo'].tolist() if not df_plano.empty else [""] 
+        with str.form("form_nova_regra_ofx", clear_on_submit=True): 
+            palabra = str.text_input("Palavra-Chave Contida no Extrato (Ex: PIX RECEB, ENERGIA)") 
+            d_c = str.selectbox("Conta de Débito Vinculada", options=lista_contas, format_func=formatar_opcao_conta_interna) 
+            c_c = str.selectbox("Conta de Crédito Vinculada", options=lista_contas, format_func=formatar_opcao_conta_interna) 
+            if str.form_submit_button("Salvar Regra de Automação") and supabase: 
+                payload_r = {"palavra_chave": palabra, "conta_debito": d_c, "conta_credito": c_c, "empresa_id": empresa_id} 
+                supabase.table("regras_mapeamento_ofx").insert(payload_r).execute() 
+                str.success("Regra de automação OFX gravada com sucesso!") 
+                str.cache_data.clear() 
+                str.rerun() 
+
+def main(): 
+    str.sidebar.markdown('<div class="logo-texto">&gt;&gt;&lt;&lt;</div>', unsafe_allow_html=True) 
+    str.sidebar.title("Fluxo Assessoria") 
+    str.sidebar.caption("Assessoria Empresarial de Alta Performance") 
+    str.sidebar.markdown("---") 
+    
+    df_empresas = buscar_empresas_contabilidade() 
+    lista_nomes = df_empresas['razao_social'].tolist() if not df_empresas.empty else ["Nenhuma cadastrada"] 
+    emp_selecionada_nome = str.sidebar.selectbox(" Selecione o Cliente Contábil", options=lista_nomes) 
+    
+    if not df_empresas.empty and emp_selecionada_nome != "Nenhuma cadastrada": 
+        id_filtrado = df_empresas[df_empresas['razao_social'] == emp_selecionada_nome]['id'].tolist() 
+        empresa_id_ativa = int(id_filtrado[0]) if len(id_filtrado) > 0 else 1 
+    else: 
+        empresa_id_ativa = 1 
+    
+    str.sidebar.markdown("---") 
+    opcao_menu = str.sidebar.radio("Navegação", ["Escrituração Contábil", "Cadastros Estruturais", "Demonstrações Oficiais"]) 
+    
+    if str.sidebar.button("Encerrar Sessão / Logout"): 
+        str.session_state['autenticado'] = False 
+        str.rerun() 
+        
+    if opcao_menu == "Escrituração Contábil": 
+        renderizar_modulo_lancamentos(empresa_id_ativa) 
+    elif opcao_menu == "Cadastros Estruturais": 
+        renderizar_modulo_cadastros(empresa_id_ativa) 
+    elif opcao_menu == "Demonstrações Oficiais": 
+        renderizar_demonstracoes(empresa_id_ativa, emp_selecionada_nome) 
+
+if __name__ == "__main__": 
+    main()
