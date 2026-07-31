@@ -11,6 +11,7 @@ str.set_page_config(
 )
 
 # Constantes de Conexão e Segurança
+# IMPORTANTE: Altere para a URL exata do seu projeto do Supabase (ex: https://supabase.co)
 SUPABASE_URL = "https://supabase.co"
 SUPABASE_KEY = "sb_publishable_4OAD9stwBHF-L-eMaZkrFg_wRGMplWa"
 USUARIO_CORRETO = "contador"
@@ -20,9 +21,10 @@ SENHA_CORRETA = "admin123"
 @str.cache_resource
 def inicializar_supabase() -> Client:
     try:
+        if SUPABASE_URL == "https://supabase.co":
+            return None
         return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        str.error("Erro crítico de conexão: Verifique a URL do Supabase.")
+    except Exception:
         return None
 
 supabase = inicializar_supabase()
@@ -35,19 +37,13 @@ str.markdown("""
         font-family: 'Roboto', 'Segoe UI', sans-serif;
     }
     .stApp { background-color: #f8f9fa; }
-    
-    /* Menu Lateral */
     [data-testid="stSidebar"] { background-color: #0b2216; color: #ffffff; }
-    
-    /* Forçar cor branca nas legendas e labels do menu lateral */
     [data-testid="stSidebar"] p, 
     [data-testid="stSidebar"] small, 
     [data-testid="stSidebar"] label, 
     [data-testid="stSidebar"] span { 
         color: #ffffff !important; 
     }
-    
-    /* Botões */
     .stButton>button {
         background-color: #00ff66 !important;
         color: #0b2216 !important;
@@ -60,8 +56,6 @@ str.markdown("""
         background-color: #00cc52 !important;
         box-shadow: 0 0 10px #00ff66;
     }
-    
-    /* Logotipo Ajustado */
     .logo-texto {
         font-size: 38px;
         font-weight: bold;
@@ -97,40 +91,45 @@ if not str.session_state['autenticado']:
 # CAMADA DE DADOS OTIMIZADA
 # ==============================================================================
 
-@str.cache_data(ttl=10)
+@str.cache_data(ttl=5)
 def buscar_plano_contas():
+    if not supabase: return pd.DataFrame(columns=["codigo", "descricao", "tipo", "nivel", "superior"])
     try:
         resposta = supabase.table("plano_contas").select("codigo, descricao, tipo, nivel, superior").execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(columns=["codigo", "descricao", "tipo", "nivel", "superior"])
     except Exception:
         return pd.DataFrame(columns=["codigo", "descricao", "tipo", "nivel", "superior"])
 
-@str.cache_data(ttl=10)
+@str.cache_data(ttl=5)
 def buscar_participantes():
+    if not supabase: return pd.DataFrame(columns=["id", "nome", "documento", "tipo"])
     try:
         resposta = supabase.table("participantes").select("id, nome, documento, tipo").execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(columns=["id", "nome", "documento", "tipo"])
     except Exception:
         return pd.DataFrame(columns=["id", "nome", "documento", "tipo"])
 
-@str.cache_data(ttl=10)
+@str.cache_data(ttl=5)
 def buscar_acumuladores():
+    if not supabase: return pd.DataFrame(columns=["id", "operacao", "aliquota"])
     try:
         resposta = supabase.table("acumuladores").select("id, operacao, aliquota").execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(columns=["id", "operacao", "aliquota"])
     except Exception:
         return pd.DataFrame(columns=["id", "operacao", "aliquota"])
 
-@str.cache_data(ttl=10)
+@str.cache_data(ttl=5)
 def buscar_historicos():
+    if not supabase: return pd.DataFrame(columns=["id", "descricao"])
     try:
         resposta = supabase.table("historicos_padrao").select("id, descricao").execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(columns=["id", "descricao"])
     except Exception:
         return pd.DataFrame(columns=["id", "descricao"])
 
-@str.cache_data(ttl=5)
+@str.cache_data(ttl=2)
 def buscar_lancamentos(data_inicio, data_fim):
+    if not supabase: return pd.DataFrame(columns=["id", "data", "conta_debito", "conta_credito", "valor", "historico"])
     try:
         resposta = supabase.table("lancamentos").select("id, data, conta_debito, conta_credito, valor, historico")\
             .gte("data", data_inicio.strftime('%Y-%m-%d'))\
@@ -178,12 +177,11 @@ def renderizar_modulo_lancamentos():
     df_acum = buscar_acumuladores()
     df_hist = buscar_historicos()
     
-    if df_plano.empty:
+    if not supabase or df_plano.empty:
         str.warning("Aviso: Não foi possível ler o Plano de Contas. Verifique se a URL do Supabase do seu projeto está correta.")
     
     aba1, aba2, aba3, aba4 = str.tabs(["Lançamento Manual", "Importação NF-e / Notas", "Folha de Pagamento", "Conciliação OFX Real"])
     
-    # 1. LANÇAMENTO MANUAL
     with aba1:
         str.subheader("Lançamento Partida Dobrada")
         if not df_plano.empty:
@@ -205,31 +203,27 @@ def renderizar_modulo_lancamentos():
                         str.error("As contas de débito e crédito não podem ser idênticas.")
                     else:
                         payload = {"data": str(data_lan), "conta_debito": c_debito, "conta_credito": c_credito, "valor": valor_lan, "historico": str(historico_lan)}
-                        supabase.table("lancamentos").insert(payload).execute()
-                        str.success("Lançamento Contábil registrado!")
-                        str.cache_data.clear()
+                        if supabase:
+                            supabase.table("lancamentos").insert(payload).execute()
+                            str.success("Lançamento Contábil registrado!")
+                            str.cache_data.clear()
 
-    # 2. LANÇAMENTO DE NOTAS FISCAIS
     with aba2:
         str.subheader("Escrituração Manual de Notas Fiscais")
         with str.form("form_nota", clear_on_submit=True):
             col1, col2, col3 = str.columns(3)
             num_nota = col1.text_input("Número da NF-e")
-            
             lista_part = df_part['nome'].tolist() if not df_part.empty else []
             partic = col2.selectbox("Fornecedor / Cliente", options=["Nenhum cadastrado"] + lista_part)
-            
             lista_acum = df_acum['id'].tolist() if not df_acum.empty else []
             acumula = col3.selectbox("Acumulador / Operação", options=["Nenhum cadastrado"] + lista_acum)
             
             col4, col5 = str.columns(2)
             v_bruto = col4.number_input("Valor Bruto (R$)", min_value=0.00)
             c_contrapartida = col5.selectbox("Conta Contábil Despesa/Estoque", options=df_plano['codigo'].tolist() if not df_plano.empty else [""])
-            
             if str.form_submit_button("Escriturar Nota Fiscal"):
-                str.success("Nota fiscal integrada ao diário com sucesso!")
+                str.success("Nota fiscal cadastrada!")
 
-    # 3. FOLHA DE PAGAMENTO
     with aba3:
         str.subheader("Provisão de Folha de Pagamento")
         with str.form("form_folha"):
@@ -238,14 +232,11 @@ def renderizar_modulo_lancamentos():
             if str.form_submit_button("Lançar Provisão de Folha"):
                 str.success("Folha provisionada com sucesso!")
 
-    # 4. CONCILIAÇÃO OFX REAL
     with aba4:
         str.subheader("Processador de Extratos Bancários OFX")
-        arquivo_ofx = str.file_uploader("Selecione o arquivo .ofx", type=["ofx"])
-        if arquivo_ofx is not None:
-            str.info("Mapeando transações financeiras...")
+        str.file_uploader("Selecione o arquivo .ofx", type=["ofx"])
 # ==============================================================================
-# MÓDULO DE CADASTROS GERAIS E MENU DE EXECUÇÃO
+# MÓDULO DE CADASTROS (VISUALIZAR, EDITAR E EXCLUIR) E DEMONSTRAÇÕES
 # ==============================================================================
 
 def renderizar_modulo_cadastros():
@@ -253,46 +244,90 @@ def renderizar_modulo_cadastros():
     c1, c2, c3, c4 = str.tabs(["Contas Contábeis", "Clientes/Fornecedores", "Acumuladores Fiscais", "Históricos Padrão"])
     
     with c1:
-        str.subheader("Cadastrar Nova Conta no Plano")
+        str.subheader("Gerenciar Plano de Contas")
+        df_p = buscar_plano_contas()
+        if not df_p.empty:
+            str.dataframe(df_p, use_container_width=True, hide_index=True)
+            conta_sel = str.selectbox("Selecione uma conta para Excluir/Editar", options=df_p['codigo'].tolist())
+            if str.button("Excluir Conta Selecionada") and supabase:
+                supabase.table("plano_contas").delete().eq("codigo", conta_sel).execute()
+                str.success("Conta excluída!")
+                str.cache_data.clear()
+                str.rerun()
+        
         with str.form("cad_conta", clear_on_submit=True):
-            cod = str.text_input("Código da Conta (Ex: 1.1.01.02)")
-            desc = str.text_input("Descrição da Conta")
+            cod = str.text_input("Novo Código da Conta")
+            desc = str.text_input("Descrição")
             tp = str.selectbox("Tipo", ["Ativo", "Passivo", "Patrimônio Líquido", "Receita", "Despesa"])
             nv = str.number_input("Nível", min_value=1, max_value=5, value=5)
-            if str.form_submit_button("Salvar Conta"):
+            if str.form_submit_button("Salvar Nova Conta") and supabase:
                 supabase.table("plano_contas").insert({"codigo": cod, "descricao": desc, "tipo": tp, "nivel": nv}).execute()
-                str.success("Conta salva!")
+                str.success("Conta cadastrada!")
                 str.cache_data.clear()
+                str.rerun()
 
     with c2:
-        str.subheader("Cadastrar Cliente ou Fornecedor")
-        with str.form("cad_part", clear_on_submit=True):
-            nome = str.text_input("Razão Social / Nome")
-            doc = str.text_input("CNPJ / CPF")
-            tipo_p = str.selectbox("Tipo de Cadastro", ["Fornecedor", "Cliente"])
-            if str.form_submit_button("Salvar Participante"):
-                supabase.table("participantes").insert({"nome": nome, "documento": doc, "tipo": tipo_p}).execute()
-                str.success("Participante cadastrado!")
+        str.subheader("Gerenciar Clientes / Fornecedores")
+        df_part = buscar_participantes()
+        if not df_part.empty:
+            str.dataframe(df_part, use_container_width=True, hide_index=True)
+            id_sel = str.selectbox("Selecione o ID para Excluir", options=df_part['id'].tolist() if 'id' in df_part.columns else [])
+            if str.button("Excluir Participante") and supabase:
+                supabase.table("participantes").delete().eq("id", id_sel).execute()
+                str.success("Participante removido!")
                 str.cache_data.clear()
+                str.rerun()
+                
+        with str.form("cad_part", clear_on_submit=True):
+            nome = str.text_input("Nome / Razão Social")
+            doc = str.text_input("CNPJ / CPF")
+            tipo_p = str.selectbox("Tipo", ["Fornecedor", "Cliente"])
+            if str.form_submit_button("Salvar") and supabase:
+                supabase.table("participantes").insert({"nome": nome, "documento": doc, "tipo": tipo_p}).execute()
+                str.success("Salvo!")
+                str.cache_data.clear()
+                str.rerun()
 
     with c3:
-        str.subheader("Cadastrar Acumulador / Operação Fiscal")
-        with str.form("cad_acum", clear_on_submit=True):
-            op = str.text_input("Nome da Operação (Ex: Venda de Serviços)")
-            aliq = str.number_input("Alíquota Imposto (%)", min_value=0.0, max_value=100.0, step=0.1)
-            if str.form_submit_button("Salvar Acumulador"):
-                supabase.table("acumuladores").insert({"operacao": op, "aliquota": aliq}).execute()
-                str.success("Acumulador salvo!")
+        str.subheader("Gerenciar Acumuladores Fiscais")
+        df_a = buscar_acumuladores()
+        if not df_a.empty:
+            str.dataframe(df_a, use_container_width=True, hide_index=True)
+            ac_sel = str.selectbox("Selecione o ID do Acumulador para Excluir", options=df_a['id'].tolist() if 'id' in df_a.columns else [])
+            if str.button("Excluir Acumulador") and supabase:
+                supabase.table("acumuladores").delete().eq("id", ac_sel).execute()
+                str.success("Acumulador deletado!")
                 str.cache_data.clear()
+                str.rerun()
+                
+        with str.form("cad_acum", clear_on_submit=True):
+            op = str.text_input("Operação Fiscal")
+            aliq = str.number_input("Alíquota (%)", min_value=0.0, max_value=100.0, step=0.1)
+            if str.form_submit_button("Salvar Acumulador") and supabase:
+                supabase.table("acumuladores").insert({"operacao": op, "aliquota": aliq}).execute()
+                str.success("Gravado!")
+                str.cache_data.clear()
+                str.rerun()
 
     with c4:
-        str.subheader("Cadastrar Histórico Padrão")
-        with str.form("cad_hist", clear_on_submit=True):
-            desc_h = str.text_input("Texto do Histórico (Ex: Vlr ref prestacao servicos)")
-            if str.form_submit_button("Salvar Histórico"):
-                supabase.table("historicos_padrao").insert({"descricao": desc_h}).execute()
-                str.success("Histórico padrão salvo!")
+        str.subheader("Gerenciar Históricos Padrão")
+        df_h = buscar_historicos()
+        if not df_h.empty:
+            str.dataframe(df_h, use_container_width=True, hide_index=True)
+            h_sel = str.selectbox("Selecione o ID do Histórico para Excluir", options=df_h['id'].tolist() if 'id' in df_h.columns else [])
+            if str.button("Excluir Histórico") and supabase:
+                supabase.table("historicos_padrao").delete().eq("id", h_sel).execute()
+                str.success("Removido!")
                 str.cache_data.clear()
+                str.rerun()
+                
+        with str.form("cad_hist", clear_on_submit=True):
+            desc_h = str.text_input("Texto do Histórico")
+            if str.form_submit_button("Salvar Histórico") and supabase:
+                supabase.table("historicos_padrao").insert({"descricao": desc_h}).execute()
+                str.success("Histórico salvo!")
+                str.cache_data.clear()
+                str.rerun()
 
 def renderizar_demonstracoes():
     str.header("Demonstrações e Relatórios Contábeis Oficiais")
@@ -304,21 +339,54 @@ def renderizar_demonstracoes():
     df_plano = buscar_plano_contas()
     df_balancete = processar_balancete_df(df_lanc, df_plano, d_fim)
     
-    sub_abas = str.tabs(["Balancete por Níveis", "DRE Dedutiva Oficial", "Balanço Patrimonial Vertical"])
+    aba_rep1, aba_rep2, aba_rep3 = str.tabs(["Balancete por Níveis", "DRE Dedutiva Oficial", "Balanço Patrimonial Vertical"])
     
-    with sub_abas:
+    with aba_rep1:
+        str.subheader("Balancete de Verificação Analítico")
         nivel_sel = str.slider("Filtrar por Nível", 1, 5, 5)
-        df_f = df_balancete[df_balancete['Nível'] <= nivel_sel]
-        str.dataframe(df_f[["Código", "Descrição", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True, hide_index=True)
+        if not df_balancete.empty:
+            df_f = df_balancete[df_balancete['Nível'] <= nivel_sel]
+            str.dataframe(df_f[["Código", "Descrição", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True, hide_index=True)
+        else:
+            str.info("Nenhum dado contábil localizado no período.")
 
-    with sub_abas:
+    with aba_rep2:
         str.subheader("DRE Dedutiva Oficial")
-        str.info("Apuração baseada nas movimentações de Receitas e Despesas do período.")
+        if not df_balancete.empty:
+            def obter_saldo_por_prefixo(prefixo):
+                filtro = df_balancete[df_balancete['Código'].str.startswith(prefixo) & (df_balancete['Nível'] == 1)]
+                return float(filtro['Saldo Atual'].values[0]) if not filtro.empty else 0.0
+            
+            rb = obter_saldo_por_prefixo("3.1")
+            ded = obter_saldo_por_prefixo("3.2")
+            rl = rb - ded
+            cust = obter_saldo_por_prefixo("4")
+            lb = rl - cust
+            desp = obter_saldo_por_prefixo("5")
+            rle = lb - desp
+            
+            str.markdown(f"""
 
-    with sub_abas:
-        str.subheader("Balanço Patrimonial Vertical")
-        df_balanco = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy()
-        str.dataframe(df_balanco[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True)
+            | Linha de Resultado da DRE Oficial | Valor Absoluto (R$) |
+            | :--- | :--- |
+            | **(=) RECEITA OPERACIONAL BRUTA** | **{rb:,.2f}** |
+            | (-) Deduções de Receita e Impostos | ({ded:,.2f}) |
+            | **(=) RECEITA LIQUIDA DO PERÍODO** | **{rl:,.2f}** |
+            | (-) Custos Contábeis | ({cust:,.2f}) |
+            | **(=) RESULTADO BRUTO** | **{lb:,.2f}** |
+            | (-) Despesas Operacionais | ({desp:,.2f}) |
+            | **(=) RESULTADO LÍQUIDO DO EXERCÍCIO (RLE)** | **{rle:,.2f}** |
+            """)
+        else:
+            str.info("Gere lançamentos para consolidar o resultado contábil da DRE.")
+
+    with aba_rep3:
+        str.subheader("Balanço Patrimonial Estruturado Vertical")
+        if not df_balancete.empty:
+            df_balanco = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy()
+            str.dataframe(df_balanco[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True)
+        else:
+            str.info("Aguardando saldos patrimoniais.")
 
 def main():
     str.sidebar.markdown('<div class="logo-texto">&gt;&gt;&lt;&lt;</div>', unsafe_allow_html=True)
