@@ -10,26 +10,25 @@ str.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Constantes de Conexão e Segurança
-# IMPORTANTE: Altere para a URL exata do seu projeto do Supabase (ex: https://supabase.co)
-SUPABASE_URL = "https://supabase.co"
-SUPABASE_KEY = "sb_publishable_4OAD9stwBHF-L-eMaZkrFg_wRGMplWa"
+# Credenciais Reais e Definitivas do Supabase
+SUPABASE_URL = "https://hcgtyuwzzhzhetvjijix.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjZ3R5dXd6emh6aGV0dmppaml4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MTc3NDAsImV4cCI6MjEwMDk5Mzc0MH0._b3waLLjoYLL_VyCWGaksovJKr4ZZi-fo2EA2z9vRpA"
+
 USUARIO_CORRETO = "contador"
 SENHA_CORRETA = "admin123"
 
-# Inicialização do Banco de Dados com Tratamento de Erros
+# Inicialização do Banco de Dados Conectado com o Projeto Real
 @str.cache_resource
 def inicializar_supabase() -> Client:
     try:
-        if SUPABASE_URL == "https://supabase.co":
-            return None
         return create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception:
+    except Exception as e:
+        str.error(f"Erro de conexão com o Supabase: {e}")
         return None
 
 supabase = inicializar_supabase()
 
-# Injeção de Identidade Visual via CSS
+# Injeção de Identidade Visual via CSS (Verde Corporativo e Legendas em Branco)
 str.markdown("""
     <style>
     @import url('https://googleapis.com');
@@ -177,8 +176,8 @@ def renderizar_modulo_lancamentos():
     df_acum = buscar_acumuladores()
     df_hist = buscar_historicos()
     
-    if not supabase or df_plano.empty:
-        str.warning("Aviso: Não foi possível ler o Plano de Contas. Verifique se a URL do Supabase do seu projeto está correta.")
+    if df_plano.empty:
+        str.warning("Aviso: Plano de contas não localizado. Caso seu banco seja novo, cadastre as contas na aba 'Cadastros Estruturais'.")
     
     aba1, aba2, aba3, aba4 = str.tabs(["Lançamento Manual", "Importação NF-e / Notas", "Folha de Pagamento", "Conciliação OFX Real"])
     
@@ -205,8 +204,10 @@ def renderizar_modulo_lancamentos():
                         payload = {"data": str(data_lan), "conta_debito": c_debito, "conta_credito": c_credito, "valor": valor_lan, "historico": str(historico_lan)}
                         if supabase:
                             supabase.table("lancamentos").insert(payload).execute()
-                            str.success("Lançamento Contábil registrado!")
+                            str.success("Lançamento Contábil registrado com sucesso!")
                             str.cache_data.clear()
+        else:
+            str.info("Por favor, adicione contas contábeis na aba de cadastros para liberar os lançamentos manuais.")
 
     with aba2:
         str.subheader("Escrituração Manual de Notas Fiscais")
@@ -222,7 +223,7 @@ def renderizar_modulo_lancamentos():
             v_bruto = col4.number_input("Valor Bruto (R$)", min_value=0.00)
             c_contrapartida = col5.selectbox("Conta Contábil Despesa/Estoque", options=df_plano['codigo'].tolist() if not df_plano.empty else [""])
             if str.form_submit_button("Escriturar Nota Fiscal"):
-                str.success("Nota fiscal cadastrada!")
+                str.success("Nota fiscal enviada ao diário!")
 
     with aba3:
         str.subheader("Provisão de Folha de Pagamento")
@@ -246,9 +247,9 @@ def renderizar_modulo_cadastros():
     with c1:
         str.subheader("Gerenciar Plano de Contas")
         df_p = buscar_plano_contas()
-        if not df_p.empty:
+        if not df_p.empty and df_p['codigo'].dropna().tolist():
             str.dataframe(df_p, use_container_width=True, hide_index=True)
-            conta_sel = str.selectbox("Selecione uma conta para Excluir/Editar", options=df_p['codigo'].tolist())
+            conta_sel = str.selectbox("Selecione uma conta para Excluir", options=df_p['codigo'].tolist())
             if str.button("Excluir Conta Selecionada") and supabase:
                 supabase.table("plano_contas").delete().eq("codigo", conta_sel).execute()
                 str.success("Conta excluída!")
@@ -269,9 +270,9 @@ def renderizar_modulo_cadastros():
     with c2:
         str.subheader("Gerenciar Clientes / Fornecedores")
         df_part = buscar_participantes()
-        if not df_part.empty:
+        if not df_part.empty and 'id' in df_part.columns:
             str.dataframe(df_part, use_container_width=True, hide_index=True)
-            id_sel = str.selectbox("Selecione o ID para Excluir", options=df_part['id'].tolist() if 'id' in df_part.columns else [])
+            id_sel = str.selectbox("Selecione o ID para Excluir", options=df_part['id'].tolist())
             if str.button("Excluir Participante") and supabase:
                 supabase.table("participantes").delete().eq("id", id_sel).execute()
                 str.success("Participante removido!")
@@ -291,9 +292,9 @@ def renderizar_modulo_cadastros():
     with c3:
         str.subheader("Gerenciar Acumuladores Fiscais")
         df_a = buscar_acumuladores()
-        if not df_a.empty:
+        if not df_a.empty and 'id' in df_a.columns:
             str.dataframe(df_a, use_container_width=True, hide_index=True)
-            ac_sel = str.selectbox("Selecione o ID do Acumulador para Excluir", options=df_a['id'].tolist() if 'id' in df_a.columns else [])
+            ac_sel = str.selectbox("Selecione o ID do Acumulador para Excluir", options=df_a['id'].tolist())
             if str.button("Excluir Acumulador") and supabase:
                 supabase.table("acumuladores").delete().eq("id", ac_sel).execute()
                 str.success("Acumulador deletado!")
@@ -312,9 +313,9 @@ def renderizar_modulo_cadastros():
     with c4:
         str.subheader("Gerenciar Históricos Padrão")
         df_h = buscar_historicos()
-        if not df_h.empty:
+        if not df_h.empty and 'id' in df_h.columns:
             str.dataframe(df_h, use_container_width=True, hide_index=True)
-            h_sel = str.selectbox("Selecione o ID do Histórico para Excluir", options=df_h['id'].tolist() if 'id' in df_h.columns else [])
+            h_sel = str.selectbox("Selecione o ID do Histórico para Excluir", options=df_h['id'].tolist())
             if str.button("Excluir Histórico") and supabase:
                 supabase.table("historicos_padrao").delete().eq("id", h_sel).execute()
                 str.success("Removido!")
@@ -344,7 +345,7 @@ def renderizar_demonstracoes():
     with aba_rep1:
         str.subheader("Balancete de Verificação Analítico")
         nivel_sel = str.slider("Filtrar por Nível", 1, 5, 5)
-        if not df_balancete.empty:
+        if not df_balancete.empty and "Nível" in df_balancete.columns:
             df_f = df_balancete[df_balancete['Nível'] <= nivel_sel]
             str.dataframe(df_f[["Código", "Descrição", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True, hide_index=True)
         else:
@@ -352,17 +353,17 @@ def renderizar_demonstracoes():
 
     with aba_rep2:
         str.subheader("DRE Dedutiva Oficial")
-        if not df_balancete.empty:
-            def obter_saldo_por_prefixo(prefixo):
+        if not df_balancete.empty and "Código" in df_balancete.columns:
+            def obtener_saldo_por_prefixo(prefixo):
                 filtro = df_balancete[df_balancete['Código'].str.startswith(prefixo) & (df_balancete['Nível'] == 1)]
-                return float(filtro['Saldo Atual'].values[0]) if not filtro.empty else 0.0
+                return float(filtro['Saldo Atual'].values) if not filtro.empty else 0.0
             
-            rb = obter_saldo_por_prefixo("3.1")
-            ded = obter_saldo_por_prefixo("3.2")
+            rb = obtener_saldo_por_prefixo("3.1")
+            ded = obtener_saldo_por_prefixo("3.2")
             rl = rb - ded
-            cust = obter_saldo_por_prefixo("4")
+            cust = obtener_saldo_por_prefixo("4")
             lb = rl - cust
-            desp = obter_saldo_por_prefixo("5")
+            desp = obtener_saldo_por_prefixo("5")
             rle = lb - desp
             
             str.markdown(f"""
@@ -382,7 +383,7 @@ def renderizar_demonstracoes():
 
     with aba_rep3:
         str.subheader("Balanço Patrimonial Estruturado Vertical")
-        if not df_balancete.empty:
+        if not df_balancete.empty and "Tipo" in df_balancete.columns:
             df_balanco = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy()
             str.dataframe(df_balanco[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True)
         else:
