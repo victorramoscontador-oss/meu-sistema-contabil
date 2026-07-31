@@ -28,7 +28,7 @@ def inicializar_supabase() -> Client:
 
 supabase = inicializar_supabase()
 
-# Injeção de Identidade Visual via CSS (Ajuste do Logotipo e Menu Branco)
+# Injeção de Identidade Visual via CSS (Ajuste de Centralização e Tamanho do Logo)
 str.markdown("""
     <style>
     @import url('https://googleapis.com');
@@ -55,14 +55,20 @@ str.markdown("""
         background-color: #00cc52 !important;
         box-shadow: 0 0 10px #00ff66;
     }
+    
+    /* Logotipo Ampliado, com Espaçamento Negativo Justo e Totalmente Centralizado na Sidebar */
     .logo-texto {
-        font-size: 42px;
+        font-size: 52px;
         font-weight: bold;
         color: #00ff66;
         font-family: monospace;
-        letter-spacing: -3px;
-        margin-bottom: 5px;
-        padding-top: 5px;
+        letter-spacing: -5px;
+        text-align: center;
+        margin-top: -15px;
+        margin-bottom: 15px;
+        padding-right: 15px;
+        display: block;
+        width: 100%;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -92,7 +98,6 @@ if not str.session_state['autenticado']:
 
 @str.cache_data(ttl=5)
 def buscar_plano_contas():
-    # Plano estruturado e hierárquico idêntico ao modelo contábil do PDF enviado
     dados_hardman = [
         {"codigo": "1", "descricao": "ATIVO", "tipo": "Ativo", "nivel": 1, "superior": ""},
         {"codigo": "1.1", "descricao": "ATIVO CIRCULANTE", "tipo": "Ativo", "nivel": 2, "superior": "1"},
@@ -127,7 +132,6 @@ def buscar_plano_contas():
 
 @str.cache_data(ttl=5)
 def buscar_participantes():
-    # Carga padrão extraída do balancete real do cliente
     dados_part = [
         {"id": 1, "nome": "THALIA DOS SANTOS GUILHERME", "documento": "53.957.929", "tipo": "Fornecedor"},
         {"id": 2, "nome": "ELEVADORES OTIS LTDA", "documento": "32.387.842", "tipo": "Fornecedor"},
@@ -216,7 +220,7 @@ def renderizar_modulo_lancamentos():
         str.subheader("Lançamento Partida Dobrada")
         with str.form("form_manual", clear_on_submit=True):
             col1, col2 = str.columns(2)
-            data_lan = col1.date_input("Data do Fato Contábil")
+            data_lan = col1.date_input("Data do Fato Contábil", format="DD/MM/YYYY")
             valor_lan = col2.number_input("Valor (R$)", min_value=0.01, step=10.0)
             
             lista_hist = df_hist['descricao'].tolist() if not df_hist.empty else []
@@ -234,7 +238,7 @@ def renderizar_modulo_lancamentos():
                     payload = {"data": str(data_lan), "conta_debito": c_debito, "conta_credito": c_credito, "valor": valor_lan, "historico": str(historico_lan)}
                     if supabase:
                         supabase.table("lancamentos").insert(payload).execute()
-                        str.success("Lançamento Contábil registrado!")
+                        str.success("Lançamento Contábil registrado com sucesso!")
                         str.cache_data.clear()
 
     with aba2:
@@ -243,11 +247,11 @@ def renderizar_modulo_lancamentos():
             col1, col2, col3 = str.columns(3)
             num_nota = col1.text_input("Número da NF-e")
             lista_part = df_part['nome'].tolist() if not df_part.empty else []
-            partic = col2.selectbox("Fornecedor / Cliente", options=lista_part)
+            col2.selectbox("Fornecedor / Cliente", options=lista_part)
             lista_acum = df_acum['id'].tolist() if not df_acum.empty else []
             str.selectbox("Acumulador / Operação", options=lista_acum)
             
-            v_bruto = str.number_input("Valor Bruto (R$)", min_value=0.00)
+            str.number_input("Valor Bruto (R$)", min_value=0.00)
             if str.form_submit_button("Escriturar Nota Fiscal"):
                 str.success("Nota fiscal enviada ao diário!")
 
@@ -313,8 +317,8 @@ def renderizar_modulo_cadastros():
 def renderizar_demonstracoes():
     str.header("Demonstrações e Relatórios Contábeis Oficiais")
     col_data1, col_data2 = str.columns(2)
-    d_ini = col_data1.date_input("Data de Início", pd.to_datetime("2026-01-01"))
-    d_fim = col_data2.date_input("Data de Fim", pd.to_datetime("2026-12-31"))
+    d_ini = col_data1.date_input("Data de Início", pd.to_datetime("2026-01-01"), format="DD/MM/YYYY")
+    d_fim = col_data2.date_input("Data de Fim", pd.to_datetime("2026-12-31"), format="DD/MM/YYYY")
     
     df_lanc = buscar_lancamentos(d_ini, d_fim)
     df_plano = buscar_plano_contas()
@@ -338,6 +342,7 @@ def renderizar_demonstracoes():
         str.dataframe(df_balanco[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True)
 
 def main():
+    # Renderização da marca centralizada e com tamanho aumentado no topo esquerdo do menu
     str.sidebar.markdown('<div class="logo-texto">&gt;&gt;&lt;&lt;</div>', unsafe_allow_html=True)
     str.sidebar.title("Fluxo Assessoria")
     str.sidebar.caption("Assessoria Financeira de Alta Performance")
