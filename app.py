@@ -134,7 +134,6 @@ def buscar_empresas_contabilidade():
 
 @str.cache_data(ttl=5)
 def buscar_plano_contas(empresa_id):
-    # Plano estruturado por níveis e grupos rigorosamente idêntico ao balancete real fornecido
     dados_hardman = [
         {"codigo": "1", "descricao": "ATIVO", "tipo": "Ativo", "nivel": 1},
         {"codigo": "1.1", "descricao": "ATIVO CIRCULANTE", "tipo": "Ativo", "nivel": 2},
@@ -142,7 +141,6 @@ def buscar_plano_contas(empresa_id):
         {"codigo": "1.1.1.01.0001", "descricao": "CAIXA GERAL", "tipo": "Ativo", "nivel": 5},
         {"codigo": "1.1.1.02.0002", "descricao": "BRADESCO", "tipo": "Ativo", "nivel": 5},
         {"codigo": "1.1.1.02.0006", "descricao": "BANCO INTER", "tipo": "Ativo", "nivel": 5},
-        {"codigo": "1.1.2.01.0002", "descricao": "WILLANDA DANTAS QUEIROGA ASSIS", "tipo": "Ativo", "nivel": 5},
         {"codigo": "2", "descricao": "PASSIVO", "tipo": "Passivo", "nivel": 1},
         {"codigo": "2.1", "descricao": "PASSIVO CIRCULANTE", "tipo": "Passivo", "nivel": 2},
         {"codigo": "2.1.1.01.0010", "descricao": "FORNECEDORES DIVERSOS", "tipo": "Passivo", "nivel": 5},
@@ -249,7 +247,6 @@ def renderizar_modulo_lancamentos(empresa_id):
     
     aba1, aba2, aba3 = str.tabs(["Lançamento Manual", "Importação de Notas Fiscais", "Conciliação OFX Real"])
     
-    # Função auxiliar para formatar a exibição da conta com Código + Descrição com segurança
     def formatar_opcao_conta(codigo):
         if not codigo or df_plano.empty:
             return ""
@@ -324,10 +321,9 @@ def renderizar_modulo_lancamentos(empresa_id):
             if str.button("Confirmar Importação OFX no Diário") and supabase:
                 for _, row in df_reconciliado.iterrows():
                     if row['Status'] == "✅ Identificada":
-                        # Resgata apenas o código puro para salvar no banco
-                        deb_cod = row['Débito'].split(" - ")[0] if row['Débito'] else ""
-                        cred_cod = row['Crédito'].split(" - ")[0] if row['Crédito'] else ""
-                        payload_ofx = {"data": row['Data'], "conta_debito": deb_cod, "conta_credito": cred_cod, "valor": float(row['Valor']), "historico": f"OFX Auto: {row['Documento']}", "empresa_id": empresa_id}
+                        deb_puro = row['Débito'].split(" - ")[0] if row['Débito'] else ""
+                        cred_puro = row['Crédito'].split(" - ")[0] if row['Crédito'] else ""
+                        payload_ofx = {"data": row['Data'], "conta_debito": deb_puro, "conta_credito": cred_puro, "valor": float(row['Valor']), "historico": f"OFX Auto: {row['Documento']}", "empresa_id": empresa_id}
                         supabase.table("lancamentos").insert(payload_ofx).execute()
                 str.success("Transações mapeadas gravadas!")
                 str.cache_data.clear()
@@ -363,7 +359,6 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
                 filtro = df_balancete[df_balancete['Código'].str.startswith(prefixo) & (df_balancete['Nível'] == 1)]
                 return float(filtro['Saldo Atual'].values[0]) if (not filtro.empty and len(filtro['Saldo Atual'].values) > 0) else 0.0
             
-            # Recuperação e totalização baseada em lógica estrita de sinais contábeis (Lei das S.A.)
             rec_bruta = obter_saldo("3")
             deducoes = obter_saldo("3.2")
             rec_liquida = rec_bruta - deducoes
@@ -377,9 +372,9 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
             | Linhas de Resultado Estruturadas (Lei 6.404/76) | Valor Acumulado (R$) |
             | :--- | :--- |
             | **(=) RECEITA OPERACIONAL BRUTA (Faturamento)** | **{rec_bruta:,.2f}** |
-            | (-) Deduções de Receita, Glosas e Impostos Diretos | ({deducoes:,.2f}) |
+            | (-) Deduções de Receita e Impostos Diretos | ({deducoes:,.2f}) |
             | **(=) RECEITA OPERACIONAL LÍQUIDA** | **{rec_liquida:,.2f}** |
-            | (-) Custos dos Serviços e Produtos Comercializados | ({custos:,.2f}) |
+            | (-) Custos dos Serviços / Mercadorias Vendidas | ({custos:,.2f}) |
             | **(=) RESULTADO BRUTO DO PERÍODO** | **{lucro_bruto:,.2f}** |
             | (-) Despesas Administrativas, Gerais e Operacionais | ({despesas:,.2f}) |
             | **(=) RESULTADO LÍQUIDO DO EXERCÍCIO (RLE)** | **{lucro_liquido:,.2f}** |
@@ -388,7 +383,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
             str.info("Sem movimentações de contas de resultado registradas no diário.")
 
     with aba_rep3:
-        str.subheader("Balanço Patrimonial")
+        str.subheader("Balanço Patrimonial Vertical")
         if not df_balancete.empty:
             df_patrimonio = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy()
             str.dataframe(df_patrimonio[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True)
@@ -396,8 +391,8 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
             str.info("Aguardando consolidação de lançamentos patrimoniais.")
 def renderizar_modulo_cadastros(empresa_id):
     str.header("Painel de Cadastros Estruturais")
-    aba_emp, aba_contas, aba_part, aba_acum, aba_hist = str.tabs([
-        "Empresas", "Contas Contábeis", "Clientes/Fornecedores", "Acumuladores Fiscais", "Históricos Padrão"
+    aba_emp, aba_contas, aba_part, aba_acum, aba_hist, aba_ofx = str.tabs([
+        "Empresas", "Contas Contábeis", "Clientes/Fornecedores", "Acumuladores Fiscais", "Históricos Padrão", "Regras OFX"
     ])
     
     with aba_emp:
@@ -463,6 +458,26 @@ def renderizar_modulo_cadastros(empresa_id):
             if str.form_submit_button("Salvar Histórico") and supabase:
                 supabase.table("historicos_padrao").insert({"descricao": h_ds, "empresa_id": empresa_id}).execute()
                 str.success("Histórico salvo!")
+                str.cache_data.clear()
+                str.rerun()
+
+    with aba_ofx:
+        str.subheader("Mapeamento Contábil de Extratos OFX")
+        df_rx = buscar_regras_ofx(empresa_id)
+        str.dataframe(df_rx, use_container_width=True, hide_index=True)
+        
+        df_plano = buscar_plano_contas(empresa_id)
+        lista_contas = df_plano['codigo'].tolist() if not df_plano.empty else [""]
+        
+        with str.form("form_nova_regra_ofx", clear_on_submit=True):
+            palabra = str.text_input("Palavra-Chave Contida no Extrato (Ex: PIX RECEB, ENERGIA)")
+            d_c = str.selectbox("Conta de Débito Vinculada", options=lista_contas)
+            c_c = str.selectbox("Conta de Crédito Vinculada", options=lista_contas)
+            
+            if str.form_submit_button("Salvar Regra de Automação") and supabase:
+                payload_r = {"palavra_chave": palabra, "conta_debito": d_c, "conta_credito": c_c, "empresa_id": empresa_id}
+                supabase.table("regras_mapeamento_ofx").insert(payload_r).execute()
+                str.success("Regra de automação OFX gravada com sucesso!")
                 str.cache_data.clear()
                 str.rerun()
 
