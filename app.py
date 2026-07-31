@@ -167,7 +167,7 @@ def processar_balancete_df(df_lancamentos, df_plano, data_limite):
         })
     return pd.DataFrame(balancete_dados)
 # ==============================================================================
-# MÓDULOS DE LANÇAMENTOS (CORREÇÃO DE SINTAXE DAS ABAS)
+# MÓDULOS DE LANÇAMENTOS
 # ==============================================================================
 
 def renderizar_modulo_lancamentos():
@@ -192,9 +192,8 @@ def renderizar_modulo_lancamentos():
                 data_lan = col1.date_input("Data do Fato Contábil")
                 valor_lan = col2.number_input("Valor (R$)", min_value=0.01, step=10.0)
                 
-                # Histórico padrão dinâmico ou manual
                 lista_hist = df_hist['descricao'].tolist() if not df_hist.empty else []
-                historico_lan = str.combobox("Histórico da Operação", options=[""] + lista_hist) if lista_hist else str.text_input("Histórico da Operação")
+                historico_lan = str.selectbox("Histórico da Operação", options=[""] + lista_hist) if lista_hist else str.text_input("Histórico da Operação")
                 
                 col4, col5 = str.columns(2)
                 opcoes_contas = df_plano['codigo'].tolist()
@@ -203,7 +202,7 @@ def renderizar_modulo_lancamentos():
                 
                 if str.form_submit_button("Gravar Lançamento"):
                     if c_debito == c_credito:
-                        str.error("Contas idênticas.")
+                        str.error("As contas de débito e crédito não podem ser idênticas.")
                     else:
                         payload = {"data": str(data_lan), "conta_debito": c_debito, "conta_credito": c_credito, "valor": valor_lan, "historico": str(historico_lan)}
                         supabase.table("lancamentos").insert(payload).execute()
@@ -216,8 +215,12 @@ def renderizar_modulo_lancamentos():
         with str.form("form_nota", clear_on_submit=True):
             col1, col2, col3 = str.columns(3)
             num_nota = col1.text_input("Número da NF-e")
-            partic = col2.selectbox("Fornecedor / Cliente", options=df_part['nome'].tolist() if not df_part.empty else ["Nenhum cadastrado"])
-            acumula = col3.selectbox("Acumulador / Operação", options=df_acum['id'].tolist() if not df_acum.empty else)
+            
+            lista_part = df_part['nome'].tolist() if not df_part.empty else []
+            partic = col2.selectbox("Fornecedor / Cliente", options=["Nenhum cadastrado"] + lista_part)
+            
+            lista_acum = df_acum['id'].tolist() if not df_acum.empty else []
+            acumula = col3.selectbox("Acumulador / Operação", options=["Nenhum cadastrado"] + lista_acum)
             
             col4, col5 = str.columns(2)
             v_bruto = col4.number_input("Valor Bruto (R$)", min_value=0.00)
@@ -242,7 +245,7 @@ def renderizar_modulo_lancamentos():
         if arquivo_ofx is not None:
             str.info("Mapeando transações financeiras...")
 # ==============================================================================
-# NOVO MÓDULO DE CADASTROS GERAIS E MENU DE EXECUÇÃO
+# MÓDULO DE CADASTROS GERAIS E MENU DE EXECUÇÃO
 # ==============================================================================
 
 def renderizar_modulo_cadastros():
@@ -303,17 +306,16 @@ def renderizar_demonstracoes():
     
     sub_abas = str.tabs(["Balancete por Níveis", "DRE Dedutiva Oficial", "Balanço Patrimonial Vertical"])
     
-    with sub_abas[0]:
+    with sub_abas:
         nivel_sel = str.slider("Filtrar por Nível", 1, 5, 5)
         df_f = df_balancete[df_balancete['Nível'] <= nivel_sel]
         str.dataframe(df_f[["Código", "Descrição", "Débito", "Crédito", "Saldo Atual"]], use_container_width=True, hide_index=True)
 
-    with sub_abas[1]:
+    with sub_abas:
         str.subheader("DRE Dedutiva Oficial")
-        # Estrutura DRE simplificada baseada no saldo do balancete
         str.info("Apuração baseada nas movimentações de Receitas e Despesas do período.")
 
-    with sub_abas[2]:
+    with sub_abas:
         str.subheader("Balanço Patrimonial Vertical")
         df_balanco = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy()
         str.dataframe(df_balanco[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True)
