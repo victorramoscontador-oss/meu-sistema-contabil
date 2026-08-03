@@ -242,15 +242,11 @@ def renderizar_modulo_lancamentos(empresa_id):
     
     aba1, aba2, aba3 = str.tabs(["Lançamento Manual", "Importação de Notas Fiscais", "Conciliação OFX Real"]) 
     
-    # CORREÇÃO DEFINITIVA: iloc[0] extrai o elemento em formato string pura resolvendo o TypeError
-    def formatar_opcao_conta(codigo): 
-        if not codigo or df_plano.empty: 
-            return "" 
-        linha = df_plano[df_plano['codigo'] == codigo] 
-        if not linha.empty: 
-            return f"{codigo} - {linha['descricao'].iloc[0]}" 
-        return codigo 
-    
+    opcoes_contas_completas = []
+    if not df_plano.empty:
+        for _, row in df_plano.iterrows():
+            opcoes_contas_completas.append(f"{row['codigo']} - {row['descricao']}")
+            
     with aba1: 
         str.subheader("Lançamento Partida Dobrada (Diário)") 
         with str.form("form_manual", clear_on_submit=True): 
@@ -263,18 +259,20 @@ def renderizar_modulo_lancamentos(empresa_id):
             if not historico_lan: 
                 historico_lan = str.text_input("Histórico Manual") 
             
-            opcoes_codigos = df_plano['codigo'].tolist() if not df_plano.empty else [""] 
-            c_debito = str.selectbox("Conta de Débito (Aplicação)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
-            c_cred = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
+            c_debito_sel = str.selectbox("Conta de Débito (Aplicação)", options=opcoes_contas_completas if opcoes_contas_completas else [""]) 
+            c_credito_sel = str.selectbox("Conta de Crédito (Origem)", options=opcoes_contas_completas if opcoes_contas_completas else [""]) 
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
-                texto_historico_final = f"{historico_lan}"
+                # Separa e extrai o código numérico limpando o resto do texto
+                conta_debito_final = c_debito_sel.split(" - ")[0] if c_debito_sel else ""
+                conta_credito_final = c_credito_sel.split(" - ")[0] if c_credito_sel else ""
+                
                 payload = {
                     "data": data_lan.strftime('%Y-%m-%d'), 
-                    "conta_debito": str(c_debito).strip(), 
-                    "conta_credito": str(c_cred).strip(), 
+                    "conta_debito": str(conta_debito_final).strip(), 
+                    "conta_credito": str(conta_credito_final).strip(), 
                     "valor": valor_lan, 
-                    "historico": texto_historico_final, 
+                    "historico": f"{historico_lan}", 
                     "empresa_id": empresa_id
                 } 
                 supabase.table("lancamentos").insert(payload).execute() 
@@ -289,12 +287,13 @@ def renderizar_modulo_lancamentos(empresa_id):
             partic = col_n2.selectbox("Participante Vinculado", options=df_part['nome'].tolist() if not df_part.empty else [""]) 
             acum = col_n3.selectbox("Operação / Acumulador", options=df_acum['operacao'].tolist() if not df_acum.empty else [""]) 
             v_bruto = str.number_input("Valor Bruto da Nota (R$)", min_value=0.01) 
-            opcoes_codigos = df_plano['codigo'].tolist() if not df_plano.empty else [""] 
-            c_despesa = str.selectbox("Conta de Contrapartida (Despesa/Estoque)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
-            c_origem = str.selectbox("Conta Financiadora (Fornecedores/Caixa)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
+            c_despesa_sel = str.selectbox("Conta de Contrapartida (Despesa/Estoque)", options=opcoes_contas_completas if opcoes_contas_completas else [""]) 
+            c_origem_sel = str.selectbox("Conta Financiadora (Fornecedores/Caixa)", options=opcoes_contas_completas if opcoes_contas_completas else [""]) 
             
             if str.form_submit_button("Processar e Escriturar Nota") and supabase: 
-                payload_nota = {"data": "2026-07-31", "conta_debito": str(c_despesa).strip(), "conta_credito": str(c_origem).strip(), "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
+                c_desp_f = c_despesa_sel.split(" - ")[0] if c_despesa_sel else ""
+                c_orig_f = c_origem_sel.split(" - ")[0] if c_origem_sel else ""
+                payload_nota = {"data": "2026-07-31", "conta_debito": str(c_desp_f).strip(), "conta_credito": str(c_orig_f).strip(), "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
                 supabase.table("lancamentos").insert(payload_nota).execute() 
                 str.success(f"Nota Fiscal {num_nota} integrada ao diário contábil!") 
                 str.cache_data.clear() 
@@ -314,16 +313,14 @@ def renderizar_modulo_lancamentos(empresa_id):
                     if r['palavra_chave'] in item['Documento']: 
                         deb, cred, status = r['conta_debito'], r['conta_credito'], " Identificada" 
                         break 
-                analise_regras.append({"Data": item['Data'], "Documento": item['Documento'], "Valor": item['Valor'], "Débito": formatar_opcao_conta(deb) if deb else "", "Crédito": formatar_opcao_conta(cred) if cred else "", "Status": status}) 
+                analise_regras.append({"Data": item['Data'], "Documento": item['Documento'], "Valor": item['Valor'], "Débito": deb, "Crédito": cred, "Status": status}) 
             
             df_reconciliado = pd.DataFrame(analise_regras) 
             str.dataframe(df_reconciliado, use_container_width=True, hide_index=True) 
             if str.button("Confirmar Importação OFX no Diário") and supabase: 
                 for _, row in df_reconciliado.iterrows(): 
                     if "Identificada" in row['Status']: 
-                        deb_cod = row['Débito'].split(" - ") if row['Débito'] else "" 
-                        cred_cod = row['Crédito'].split(" - ") if row['Crédito'] else "" 
-                        payload_ofx = {"data": row['Data'], "conta_debito": str(deb_cod).strip(), "conta_credito": str(cred_cod).strip(), "valor": float(row['Valor']), "historico": f"OFX Auto: {row['Documento']}", "empresa_id": empresa_id} 
+                        payload_ofx = {"data": row['Data'], "conta_debito": str(row['Débito']).strip(), "conta_credito": str(row['Crédito']).strip(), "valor": float(row['Valor']), "historico": f"OFX Auto: {row['Documento']}", "empresa_id": empresa_id} 
                         supabase.table("lancamentos").insert(payload_ofx).execute() 
                 str.success("Transações mapeadas gravadas!") 
                 str.cache_data.clear() 
