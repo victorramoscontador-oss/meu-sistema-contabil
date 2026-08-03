@@ -247,7 +247,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             return "" 
         linha = df_plano[df_plano['codigo'] == codigo] 
         if not linha.empty: 
-            return f"{codigo} - {linha['descricao'].values}" 
+            return f"{codigo} - {linha['descricao'].values[0]}" 
         return codigo 
     
     with aba1: 
@@ -264,7 +264,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             
             opcoes_codigos = df_plano['codigo'].tolist() if not df_plano.empty else [""] 
             c_debito = str.selectbox("Conta de Débito (Aplicação)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
-            c_cred = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
+            c_credito = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
                 texto_historico_final = f"{historico_lan}"
@@ -320,8 +320,8 @@ def renderizar_modulo_lancamentos(empresa_id):
             if str.button("Confirmar Importação OFX no Diário") and supabase: 
                 for _, row in df_reconciliado.iterrows(): 
                     if "Identificada" in row['Status']: 
-                        deb_cod = row['Débito'].split(" - ") if row['Débito'] else "" 
-                        cred_cod = row['Crédito'].split(" - ") if row['Crédito'] else "" 
+                        deb_cod = row['Débito'].split(" - ")[0] if row['Débito'] else "" 
+                        cred_cod = row['Crédito'].split(" - ")[0] if row['Crédito'] else "" 
                         payload_ofx = {"data": row['Data'], "conta_debito": deb_cod, "conta_credito": cred_cod, "valor": float(row['Valor']), "historico": f"OFX Auto: {row['Documento']}", "empresa_id": empresa_id} 
                         supabase.table("lancamentos").insert(payload_ofx).execute() 
                 str.success("Transações mapeadas gravadas!") 
@@ -356,7 +356,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
         if not df_balancete.empty: 
             def obter_saldo(prefixo): 
                 filtro = df_balancete[df_balancete['Código'].str.startswith(prefixo) & (df_balancete['Nível'] == 1)] 
-                return float(filtro['Saldo Atual'].values) if (not filtro.empty and len(filtro['Saldo Atual'].values) > 0) else 0.0 
+                return float(filtro['Saldo Atual'].values[0]) if not filtro.empty else 0.0 
             
             rec_bruta = obter_saldo("3") 
             deducoes = obter_saldo("3.2") 
@@ -379,7 +379,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
  | **(=) RESULTADO LÍQUIDO DO EXERCÍCIO (RLE)** | **{lucro_liquido:,.2f}** | 
  """) 
         else: 
-            str.info("Sem movimentações de contas de resultado registradas no diário.") 
+            str.info("Sem movimentações de contas de resultado registrada no diário.") 
             
     with aba_rep3: 
         str.subheader("Balanço Patrimonial") 
@@ -467,7 +467,7 @@ def renderizar_modulo_cadastros(empresa_id):
         df_regras_visualizar = buscar_regras_ofx(empresa_id)
         str.dataframe(df_regras_visualizar, use_container_width=True, hide_index=True)
         with str.form("form_ofx_regra", clear_on_submit=True):
-            palavra_chave = str.text_input("Palavra-Chave do Extrato (Ex: PIX RECEB)")
+            palavra_chave = str.text_input("Palavra-Chave do Extrato")
             c_deb = str.text_input("Conta de Débito Padrão")
             c_cred = str.text_input("Conta de Crédito Padrão")
             if str.form_submit_button("Salvar Nova Regra OFX") and supabase:
@@ -484,7 +484,7 @@ def main():
     
     df_empresas = buscar_empresas_contabilidade() 
     lista_nomes = df_empresas['razao_social'].tolist() if not df_empresas.empty else ["Nenhuma cadastrada"] 
-    emp_selecionada_nome = str.sidebar.selectbox("💼 Selecione o Cliente Contábil", options=lista_nomes) 
+    emp_selecionada_nome = str.sidebar.selectbox(" Selecione o Cliente Contábil", options=lista_nomes) 
     
     if not df_empresas.empty and emp_selecionada_nome != "Nenhuma cadastrada": 
         id_filtrado = df_empresas[df_empresas['razao_social'] == emp_selecionada_nome]['id'].values 
