@@ -59,23 +59,35 @@ str.markdown("""
  font-weight: 900; 
  color: #00ff66; 
  font-family: 'Segoe UI', monospace; 
- letter-spacing: -6px; text-align: center; 
- margin-top: -25px; margin-bottom: 5px; padding: 0; 
- display: block; width: 100%; line-height: 1; 
+ letter-spacing: -6px; 
+ text-align: center; 
+ margin-top: -25px; 
+ margin-bottom: 5px; 
+ padding: 0; 
+ display: block; 
+ width: 100%; 
+ line-height: 1; 
  } 
  @media print { 
  body * { visibility: hidden; } 
  .print-area, .print-area * { visibility: visible; } 
  .print-area { 
- position: absolute; left: 0; top: 0; width: 100%; 
- color: #000000 !important; background: #ffffff !important; font-size: 12px; 
+ position: absolute; 
+ left: 0; top: 0; width: 100%; 
+ color: #000000 !important; 
+ background: #ffffff !important; 
+ font-size: 12px; 
  } 
  [data-testid="stSidebar"] { display: none !important; } 
  header { display: none !important; } 
  .print-area::before { 
  content: "FLUXO ASSESSORIA EMPRESARIAL"; 
- position: absolute; right: 0; top: -20px; 
- font-size: 10px; font-weight: bold; color: #555555; font-family: sans-serif; 
+ position: absolute; 
+ right: 0; top: -20px; 
+ font-size: 10px; 
+ font-weight: bold; 
+ color: #555555; 
+ font-family: sans-serif; 
  } 
  } 
  </style> 
@@ -251,7 +263,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             c_credito_sel = str.selectbox("Conta de Crédito (Origem)", options=opcoes_contas_completas if opcoes_contas_completas else [""]) 
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
-                # SOLUÇÃO FINAL: O split cria a lista e extraímos a posição zero [0] para pegar apenas a numeração limpa em texto puro, matando o TypeError
+                # CONSERTO ABSOLUTO: O índice [0] extrai apenas o código textual puro da lista, impedindo o TypeError com .strip()
                 c_deb_puro = c_debito_sel.split(" - ")[0] if c_debito_sel else ""
                 c_cred_puro = c_credito_sel.split(" - ")[0] if c_credito_sel else ""
                 
@@ -373,7 +385,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
             df_patrimonio = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy() 
             str.dataframe(df_patrimonio[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True) 
         else: 
-            str.info("Aguardando consolidação de lançamentos patrimoniais.") 
+            str.info("Aguardando consolidation de lançamentos patrimoniais.") 
 
 def renderizar_modulo_cadastros(empresa_id): 
     str.header("Painel de Cadastros Estruturais") 
@@ -474,7 +486,7 @@ def main():
     
     if not df_empresas.empty and emp_selecionada_nome != "Nenhuma cadastrada": 
         id_filtrado = df_empresas[df_empresas['razao_social'] == emp_selecionada_nome]['id'].values 
-        empresa_id_ativa = int(id_filtrado[0]) if len(id_filtrado) > 0 else 1 
+        empresa_id_ativa = int(id_filtrado) if len(id_filtrado) > 0 else 1 
     else: 
         empresa_id_ativa = 1 
         
