@@ -11,7 +11,7 @@ str.set_page_config(
  initial_sidebar_state="expanded" 
 ) 
 
-# REINSERIDO: Controle de Acesso e Credenciais Oficiais da Assessoria
+# Credenciais Reais do Supabase do Cliente 
 SUPABASE_URL = "https://supabase.co" 
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjZ3R5dXd6emh6aGV0dmppaml4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MTc3NDAsImV4cCI6MjEwMDk5Mzc0MH0._b3waLLjoYLL_VyCWGaksovJKr4ZZi-fo2EA2z9vRpA" 
 USUARIO_CORRETO = "contador" 
@@ -242,12 +242,13 @@ def renderizar_modulo_lancamentos(empresa_id):
     
     aba1, aba2, aba3 = str.tabs(["Lançamento Manual", "Importação de Notas Fiscais", "Conciliação OFX Real"]) 
     
+    # CONSERTO CRÍTICO: iloc[0] adicionado para extrair a descrição limpa em formato texto e remover o erro ArrowStringArray
     def formatar_opcao_conta(codigo): 
         if not codigo or df_plano.empty: 
             return "" 
         linha = df_plano[df_plano['codigo'] == codigo] 
         if not linha.empty: 
-            return f"{codigo} - {linha['descricao'].values}" 
+            return f"{codigo} - {linha['descricao'].iloc[0]}" 
         return codigo 
     
     with aba1: 
@@ -268,11 +269,11 @@ def renderizar_modulo_lancamentos(empresa_id):
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
                 texto_historico_final = f"{historico_lan}"
-                # CORREGIDO: Chave de gravação parametrizada de acordo com as colunas reais ("conta_credito")
+                # ASSEGURADO: Envia apenas o código puro limpo de string (ex: "1.1") para evitar rejeição da API
                 payload = {
                     "data": data_lan.strftime('%Y-%m-%d'), 
-                    "conta_debito": c_debito, 
-                    "conta_credito": c_cred, 
+                    "conta_debito": str(c_debito).strip(), 
+                    "conta_credito": str(c_cred).strip(), 
                     "valor": valor_lan, 
                     "historico": texto_historico_final, 
                     "empresa_id": empresa_id
@@ -294,7 +295,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             c_origem = str.selectbox("Conta Financiadora (Fornecedores/Caixa)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
             
             if str.form_submit_button("Processar e Escriturar Nota") and supabase: 
-                payload_nota = {"data": "2026-07-31", "conta_debito": c_despesa, "conta_credito": c_origem, "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
+                payload_nota = {"data": "2026-07-31", "conta_debito": str(c_despesa).strip(), "conta_credito": str(c_origem).strip(), "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
                 supabase.table("lancamentos").insert(payload_nota).execute() 
                 str.success(f"Nota Fiscal {num_nota} integrada ao diário contábil!") 
                 str.cache_data.clear() 
@@ -321,9 +322,9 @@ def renderizar_modulo_lancamentos(empresa_id):
             if str.button("Confirmar Importação OFX no Diário") and supabase: 
                 for _, row in df_reconciliado.iterrows(): 
                     if "Identificada" in row['Status']: 
-                        deb_cod = row['Débito'].split(" - ") if row['Débito'] else "" 
-                        cred_cod = row['Crédito'].split(" - ") if row['Crédito'] else "" 
-                        payload_ofx = {"data": row['Data'], "conta_debito": deb_cod, "conta_credito": cred_cod, "valor": float(row['Valor']), "historico": f"OFX Auto: {row['Documento']}", "empresa_id": empresa_id} 
+                        deb_cod = row['Débito'].split(" - ")[0] if row['Débito'] else "" 
+                        cred_cod = row['Crédito'].split(" - ")[0] if row['Crédito'] else "" 
+                        payload_ofx = {"data": row['Data'], "conta_debito": str(deb_cod).strip(), "conta_credito": str(cred_cod).strip(), "valor": float(row['Valor']), "historico": f"OFX Auto: {row['Documento']}", "empresa_id": empresa_id} 
                         supabase.table("lancamentos").insert(payload_ofx).execute() 
                 str.success("Transações mapeadas gravadas!") 
                 str.cache_data.clear() 
