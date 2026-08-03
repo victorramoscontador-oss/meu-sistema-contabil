@@ -264,14 +264,15 @@ def renderizar_modulo_lancamentos(empresa_id):
             
             opcoes_codigos = df_plano['codigo'].tolist() if not df_plano.empty else [""] 
             c_debito = str.selectbox("Conta de Débito (Aplicação)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
-            c_credito = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
+            c_cred = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
                 texto_historico_final = f"{historico_lan}"
+                # CORREÇÃO DA API: Chaves do payload sincronizadas rigorosamente com as colunas da tabela "lancamentos" do Supabase
                 payload = {
                     "data": data_lan.strftime('%Y-%m-%d'), 
                     "conta_debito": c_debito, 
-                    "conta_credito": c_credito, 
+                    "conta_credito": c_cred, 
                     "valor": valor_lan, 
                     "historico": texto_historico_final, 
                     "empresa_id": empresa_id
