@@ -264,8 +264,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             
             opcoes_codigos = df_plano['codigo'].tolist() if not df_plano.empty else [""] 
             c_debito = str.selectbox("Conta de Débito (Aplicação)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
-            # CONSERTO DO NAMEERROR: Variável alterada de c_cred para c_credito para bater com o payload abaixo
-            c_credito = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
+            c_cred = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
                 texto_historico_final = f"{historico_lan}"
@@ -472,7 +471,7 @@ def renderizar_modulo_cadastros(empresa_id):
             c_deb = str.text_input("Conta de Débito Padrão")
             c_cred = str.text_input("Conta de Crédito Padrão")
             if str.form_submit_button("Salvar Nova Regra OFX") and supabase:
-                supabase.table("regras_mapeamento_ofx").insert({"palavra_chave": palabra_chave, "conta_debito": c_deb, "conta_credito": c_cred, "empresa_id": empresa_id}).execute()
+                supabase.table("regras_mapeamento_ofx").insert({"palavra_chave": palavra_chave, "conta_debito": c_deb, "conta_credito": c_cred, "empresa_id": empresa_id}).execute()
                 str.success("Regra de conciliação salva com sucesso!") 
                 str.cache_data.clear()
                 str.rerun()
@@ -489,7 +488,7 @@ def main():
     
     if not df_empresas.empty and emp_selecionada_nome != "Nenhuma cadastrada": 
         id_filtrado = df_empresas[df_empresas['razao_social'] == emp_selecionada_nome]['id'].values 
-        empresa_id_ativa = int(id_filtrado) if len(id_filtrado) > 0 else 1 
+        empresa_id_ativa = int(id_filtrado[0]) if len(id_filtrado) > 0 else 1 
     else: 
         empresa_id_ativa = 1 
         
