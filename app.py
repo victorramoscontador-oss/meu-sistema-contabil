@@ -268,7 +268,6 @@ def renderizar_modulo_lancamentos(empresa_id):
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
                 texto_historico_final = f"{historico_lan}"
-                # CONSERTO ABSOLUTO: "conta_credito" agora bate com a especificação da tabela do Supabase
                 payload = {
                     "data": data_lan.strftime('%Y-%m-%d'), 
                     "conta_debito": c_debito, 
@@ -357,7 +356,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
         if not df_balancete.empty: 
             def obter_saldo(prefixo): 
                 filtro = df_balancete[df_balancete['Código'].str.startswith(prefixo) & (df_balancete['Nível'] == 1)] 
-                return float(filtro['Saldo Atual'].values) if not filtro.empty else 0.0 
+                return float(filtro['Saldo Atual'].values[0]) if not filtro.empty else 0.0 
             
             rec_bruta = obter_saldo("3") 
             deducoes = obter_saldo("3.2") 
@@ -385,7 +384,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
     with aba_rep3: 
         str.subheader("Balanço Patrimonial") 
         if not df_balancete.empty: 
-            df_patrimonio = df_balancete[df_patrimonio['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy() 
+            df_patrimonio = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy() 
             str.dataframe(df_patrimonio[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True) 
         else: 
             str.info("Aguardando consolidação de lançamentos patrimoniais.") 
@@ -489,7 +488,8 @@ def main():
     
     if not df_empresas.empty and emp_selecionada_nome != "Nenhuma cadastrada": 
         id_filtrado = df_empresas[df_empresas['razao_social'] == emp_selecionada_nome]['id'].values 
-        empresa_id_ativa = int(id_filtrado) if len(id_filtrado) > 0 else 1 
+        # CONSERTO FINAL: id_filtrado[0] extrai o número da lista com total segurança
+        empresa_id_ativa = int(id_filtrado[0]) if len(id_filtrado) > 0 else 1 
     else: 
         empresa_id_ativa = 1 
         
@@ -507,5 +507,5 @@ def main():
     elif opcao_menu == "Demonstrações Oficiais": 
         renderizar_demonstracoes(empresa_id_ativa, emp_selecionada_nome) 
 
-if __name__ == "__main__": 
-    main()
+if name == "main":
+ main()
