@@ -263,14 +263,14 @@ def renderizar_modulo_lancamentos(empresa_id):
             c_credito_sel = str.selectbox("Conta de Crédito (Origem)", options=opcoes_contas_completas if opcoes_contas_completas else [""]) 
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
-                # CONSERTO ABSOLUTO: O índice [0] extrai apenas o código textual puro da lista, impedindo o TypeError com .strip()
-                c_deb_puro = c_debito_sel.split(" - ")[0] if c_debito_sel else ""
-                c_cred_puro = c_credito_sel.split(" - ")[0] if c_credito_sel else ""
+                c_deb_puro = c_debito_sel.split(" - ") if c_debito_sel else [""]
+                c_cred_puro = c_credito_sel.split(" - ") if c_credito_sel else [""]
                 
+                # CONSERTO REAL: Acessa a posição [0] para pegar a string pura do código (ex: "1.1") matando o erro do strip()
                 payload = {
                     "data": data_lan.strftime('%Y-%m-%d'), 
-                    "conta_debito": str(c_deb_puro).strip(), 
-                    "conta_credito": str(c_cred_puro).strip(), 
+                    "conta_debito": str(c_deb_puro[0]).strip(), 
+                    "conta_credito": str(c_cred_puro[0]).strip(), 
                     "valor": valor_lan, 
                     "historico": f"{historico_lan}", 
                     "empresa_id": empresa_id
@@ -291,9 +291,9 @@ def renderizar_modulo_lancamentos(empresa_id):
             c_origem_sel = str.selectbox("Conta Financiadora (Fornecedores/Caixa)", options=opcoes_contas_completas if opcoes_contas_completas else [""]) 
             
             if str.form_submit_button("Processar e Escriturar Nota") and supabase: 
-                c_desp_puro = c_despesa_sel.split(" - ")[0] if c_despesa_sel else ""
-                c_orig_puro = c_origem_sel.split(" - ")[0] if c_origem_sel else ""
-                payload_nota = {"data": "2026-07-31", "conta_debito": str(c_desp_puro).strip(), "conta_credito": str(c_orig_puro).strip(), "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
+                c_desp_puro = c_despesa_sel.split(" - ") if c_despesa_sel else [""]
+                c_orig_puro = c_origem_sel.split(" - ") if c_origem_sel else [""]
+                payload_nota = {"data": "2026-07-31", "conta_debito": str(c_desp_puro[0]).strip(), "conta_credito": str(c_orig_puro[0]).strip(), "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
                 supabase.table("lancamentos").insert(payload_nota).execute() 
                 str.success(f"Nota Fiscal {num_nota} integrada ao diário contábil!") 
                 str.cache_data.clear() 
@@ -385,7 +385,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
             df_patrimonio = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy() 
             str.dataframe(df_patrimonio[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True) 
         else: 
-            str.info("Aguardando consolidation de lançamentos patrimoniais.") 
+            str.info("Aguardando consolidação de lançamentos patrimoniais.") 
 
 def renderizar_modulo_cadastros(empresa_id): 
     str.header("Painel de Cadastros Estruturais") 
