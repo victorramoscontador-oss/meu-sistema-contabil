@@ -11,7 +11,7 @@ str.set_page_config(
  initial_sidebar_state="expanded" 
 ) 
 
-# Credenciais Reais do Supabase do Cliente 
+# REINSERIDO: Controle de Acesso e Credenciais Oficiais da Assessoria
 SUPABASE_URL = "https://supabase.co" 
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjZ3R5dXd6emh6aGV0dmppaml4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MTc3NDAsImV4cCI6MjEwMDk5Mzc0MH0._b3waLLjoYLL_VyCWGaksovJKr4ZZi-fo2EA2z9vRpA" 
 USUARIO_CORRETO = "contador" 
@@ -268,6 +268,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
                 texto_historico_final = f"{historico_lan}"
+                # CORREGIDO: Chave de gravação parametrizada de acordo com as colunas reais ("conta_credito")
                 payload = {
                     "data": data_lan.strftime('%Y-%m-%d'), 
                     "conta_debito": c_debito, 
@@ -488,7 +489,6 @@ def main():
     
     if not df_empresas.empty and emp_selecionada_nome != "Nenhuma cadastrada": 
         id_filtrado = df_empresas[df_empresas['razao_social'] == emp_selecionada_nome]['id'].values 
-        # CONSERTO FINAL: id_filtrado[0] extrai o número da lista com total segurança
         empresa_id_ativa = int(id_filtrado[0]) if len(id_filtrado) > 0 else 1 
     else: 
         empresa_id_ativa = 1 
@@ -507,5 +507,5 @@ def main():
     elif opcao_menu == "Demonstrações Oficiais": 
         renderizar_demonstracoes(empresa_id_ativa, emp_selecionada_nome) 
 
-if name == "main":
- main()
+if __name__ == "__main__": 
+    main()
