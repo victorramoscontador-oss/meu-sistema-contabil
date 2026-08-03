@@ -247,7 +247,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             return "" 
         linha = df_plano[df_plano['codigo'] == codigo] 
         if not linha.empty: 
-            return f"{codigo} - {linha['descricao'].values[0]}" 
+            return f"{codigo} - {linha['descricao'].values}" 
         return codigo 
     
     with aba1: 
@@ -268,7 +268,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
                 texto_historico_final = f"{historico_lan}"
-                # CORREÇÃO DA API: Chaves do payload sincronizadas rigorosamente com as colunas da tabela "lancamentos" do Supabase
+                # CONSERTO ABSOLUTO: "conta_credito" agora bate com a especificação da tabela do Supabase
                 payload = {
                     "data": data_lan.strftime('%Y-%m-%d'), 
                     "conta_debito": c_debito, 
@@ -321,8 +321,8 @@ def renderizar_modulo_lancamentos(empresa_id):
             if str.button("Confirmar Importação OFX no Diário") and supabase: 
                 for _, row in df_reconciliado.iterrows(): 
                     if "Identificada" in row['Status']: 
-                        deb_cod = row['Débito'].split(" - ")[0] if row['Débito'] else "" 
-                        cred_cod = row['Crédito'].split(" - ")[0] if row['Crédito'] else "" 
+                        deb_cod = row['Débito'].split(" - ") if row['Débito'] else "" 
+                        cred_cod = row['Crédito'].split(" - ") if row['Crédito'] else "" 
                         payload_ofx = {"data": row['Data'], "conta_debito": deb_cod, "conta_credito": cred_cod, "valor": float(row['Valor']), "historico": f"OFX Auto: {row['Documento']}", "empresa_id": empresa_id} 
                         supabase.table("lancamentos").insert(payload_ofx).execute() 
                 str.success("Transações mapeadas gravadas!") 
@@ -357,7 +357,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
         if not df_balancete.empty: 
             def obter_saldo(prefixo): 
                 filtro = df_balancete[df_balancete['Código'].str.startswith(prefixo) & (df_balancete['Nível'] == 1)] 
-                return float(filtro['Saldo Atual'].values[0]) if not filtro.empty else 0.0 
+                return float(filtro['Saldo Atual'].values) if not filtro.empty else 0.0 
             
             rec_bruta = obter_saldo("3") 
             deducoes = obter_saldo("3.2") 
@@ -385,7 +385,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
     with aba_rep3: 
         str.subheader("Balanço Patrimonial") 
         if not df_balancete.empty: 
-            df_patrimonio = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy() 
+            df_patrimonio = df_balancete[df_patrimonio['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy() 
             str.dataframe(df_patrimonio[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True) 
         else: 
             str.info("Aguardando consolidação de lançamentos patrimoniais.") 
@@ -489,7 +489,7 @@ def main():
     
     if not df_empresas.empty and emp_selecionada_nome != "Nenhuma cadastrada": 
         id_filtrado = df_empresas[df_empresas['razao_social'] == emp_selecionada_nome]['id'].values 
-        empresa_id_ativa = int(id_filtrado[0]) if len(id_filtrado) > 0 else 1 
+        empresa_id_ativa = int(id_filtrado) if len(id_filtrado) > 0 else 1 
     else: 
         empresa_id_ativa = 1 
         
