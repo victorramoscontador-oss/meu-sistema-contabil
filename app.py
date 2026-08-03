@@ -59,35 +59,23 @@ str.markdown("""
  font-weight: 900; 
  color: #00ff66; 
  font-family: 'Segoe UI', monospace; 
- letter-spacing: -6px; 
- text-align: center; 
- margin-top: -25px; 
- margin-bottom: 5px; 
- padding: 0; 
- display: block; 
- width: 100%; 
- line-height: 1; 
+ letter-spacing: -6px; text-align: center; 
+ margin-top: -25px; margin-bottom: 5px; padding: 0; 
+ display: block; width: 100%; line-height: 1; 
  } 
  @media print { 
  body * { visibility: hidden; } 
  .print-area, .print-area * { visibility: visible; } 
  .print-area { 
- position: absolute; 
- left: 0; top: 0; width: 100%; 
- color: #000000 !important; 
- background: #ffffff !important; 
- font-size: 12px; 
+ position: absolute; left: 0; top: 0; width: 100%; 
+ color: #000000 !important; background: #ffffff !important; font-size: 12px; 
  } 
  [data-testid="stSidebar"] { display: none !important; } 
  header { display: none !important; } 
  .print-area::before { 
  content: "FLUXO ASSESSORIA EMPRESARIAL"; 
- position: absolute; 
- right: 0; top: -20px; 
- font-size: 10px; 
- font-weight: bold; 
- color: #555555; 
- font-family: sans-serif; 
+ position: absolute; right: 0; top: -20px; 
+ font-size: 10px; font-weight: bold; color: #555555; font-family: sans-serif; 
  } 
  } 
  </style> 
@@ -263,14 +251,14 @@ def renderizar_modulo_lancamentos(empresa_id):
             c_credito_sel = str.selectbox("Conta de Crédito (Origem)", options=opcoes_contas_completas if opcoes_contas_completas else [""]) 
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
-                # Separa e extrai o código numérico limpando o resto do texto
-                conta_debito_final = c_debito_sel.split(" - ")[0] if c_debito_sel else ""
-                conta_credito_final = c_credito_sel.split(" - ")[0] if c_credito_sel else ""
+                # SOLUÇÃO FINAL: O split cria a lista e extraímos a posição zero [0] para pegar apenas a numeração limpa em texto puro, matando o TypeError
+                c_deb_puro = c_debito_sel.split(" - ")[0] if c_debito_sel else ""
+                c_cred_puro = c_credito_sel.split(" - ")[0] if c_credito_sel else ""
                 
                 payload = {
                     "data": data_lan.strftime('%Y-%m-%d'), 
-                    "conta_debito": str(conta_debito_final).strip(), 
-                    "conta_credito": str(conta_credito_final).strip(), 
+                    "conta_debito": str(c_deb_puro).strip(), 
+                    "conta_credito": str(c_cred_puro).strip(), 
                     "valor": valor_lan, 
                     "historico": f"{historico_lan}", 
                     "empresa_id": empresa_id
@@ -291,9 +279,9 @@ def renderizar_modulo_lancamentos(empresa_id):
             c_origem_sel = str.selectbox("Conta Financiadora (Fornecedores/Caixa)", options=opcoes_contas_completas if opcoes_contas_completas else [""]) 
             
             if str.form_submit_button("Processar e Escriturar Nota") and supabase: 
-                c_desp_f = c_despesa_sel.split(" - ")[0] if c_despesa_sel else ""
-                c_orig_f = c_origem_sel.split(" - ")[0] if c_origem_sel else ""
-                payload_nota = {"data": "2026-07-31", "conta_debito": str(c_desp_f).strip(), "conta_credito": str(c_orig_f).strip(), "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
+                c_desp_puro = c_despesa_sel.split(" - ")[0] if c_despesa_sel else ""
+                c_orig_puro = c_origem_sel.split(" - ")[0] if c_origem_sel else ""
+                payload_nota = {"data": "2026-07-31", "conta_debito": str(c_desp_puro).strip(), "conta_credito": str(c_orig_puro).strip(), "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
                 supabase.table("lancamentos").insert(payload_nota).execute() 
                 str.success(f"Nota Fiscal {num_nota} integrada ao diário contábil!") 
                 str.cache_data.clear() 
@@ -382,7 +370,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
     with aba_rep3: 
         str.subheader("Balanço Patrimonial") 
         if not df_balancete.empty: 
-            df_patrimonio = df_balancete[df_patrimonio['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy() 
+            df_patrimonio = df_balancete[df_balancete['Tipo'].isin(['Ativo', 'Passivo', 'Patrimônio Líquido'])].copy() 
             str.dataframe(df_patrimonio[["Código", "Descrição", "Tipo", "Saldo Atual"]], use_container_width=True, hide_index=True) 
         else: 
             str.info("Aguardando consolidação de lançamentos patrimoniais.") 
