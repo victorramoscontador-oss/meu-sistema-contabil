@@ -247,7 +247,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             return "" 
         linha = df_plano[df_plano['codigo'] == codigo] 
         if not linha.empty: 
-            return f"{codigo} - {linha['descricao'].values[0]}" 
+            return f"{codigo} - {linha['descricao'].values}" 
         return codigo 
     
     with aba1: 
@@ -264,7 +264,8 @@ def renderizar_modulo_lancamentos(empresa_id):
             
             opcoes_codigos = df_plano['codigo'].tolist() if not df_plano.empty else [""] 
             c_debito = str.selectbox("Conta de Débito (Aplicação)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
-            c_cred = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
+            # CONSERTO DO NAMEERROR: Variável alterada de c_cred para c_credito para bater com o payload abaixo
+            c_credito = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
                 texto_historico_final = f"{historico_lan}"
@@ -295,7 +296,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             if str.form_submit_button("Processar e Escriturar Nota") and supabase: 
                 payload_nota = {"data": "2026-07-31", "conta_debito": c_despesa, "conta_credito": c_origem, "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
                 supabase.table("lancamentos").insert(payload_nota).execute() 
-                str.success(f"Nota Fiscal {num_nota} integrated ao diário contábil!") 
+                str.success(f"Nota Fiscal {num_nota} integrada ao diário contábil!") 
                 str.cache_data.clear() 
     
     with aba3: 
@@ -320,8 +321,8 @@ def renderizar_modulo_lancamentos(empresa_id):
             if str.button("Confirmar Importação OFX no Diário") and supabase: 
                 for _, row in df_reconciliado.iterrows(): 
                     if "Identificada" in row['Status']: 
-                        deb_cod = row['Débito'].split(" - ")[0] if row['Débito'] else "" 
-                        cred_cod = row['Crédito'].split(" - ")[0] if row['Crédito'] else "" 
+                        deb_cod = row['Débito'].split(" - ") if row['Débito'] else "" 
+                        cred_cod = row['Crédito'].split(" - ") if row['Crédito'] else "" 
                         payload_ofx = {"data": row['Data'], "conta_debito": deb_cod, "conta_credito": cred_cod, "valor": float(row['Valor']), "historico": f"OFX Auto: {row['Documento']}", "empresa_id": empresa_id} 
                         supabase.table("lancamentos").insert(payload_ofx).execute() 
                 str.success("Transações mapeadas gravadas!") 
@@ -356,7 +357,7 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
         if not df_balancete.empty: 
             def obter_saldo(prefixo): 
                 filtro = df_balancete[df_balancete['Código'].str.startswith(prefixo) & (df_balancete['Nível'] == 1)] 
-                return float(filtro['Saldo Atual'].values[0]) if (not filtro.empty and len(filtro['Saldo Atual'].values) > 0) else 0.0 
+                return float(filtro['Saldo Atual'].values) if (not filtro.empty and len(filtro['Saldo Atual'].values) > 0) else 0.0 
             
             rec_bruta = obter_saldo("3") 
             deducoes = obter_saldo("3.2") 
@@ -471,7 +472,7 @@ def renderizar_modulo_cadastros(empresa_id):
             c_deb = str.text_input("Conta de Débito Padrão")
             c_cred = str.text_input("Conta de Crédito Padrão")
             if str.form_submit_button("Salvar Nova Regra OFX") and supabase:
-                supabase.table("regras_mapeamento_ofx").insert({"palavra_chave": palavra_chave, "conta_debito": c_deb, "conta_credito": c_cred, "empresa_id": empresa_id}).execute()
+                supabase.table("regras_mapeamento_ofx").insert({"palavra_chave": palabra_chave, "conta_debito": c_deb, "conta_credito": c_cred, "empresa_id": empresa_id}).execute()
                 str.success("Regra de conciliação salva com sucesso!") 
                 str.cache_data.clear()
                 str.rerun()
@@ -488,7 +489,7 @@ def main():
     
     if not df_empresas.empty and emp_selecionada_nome != "Nenhuma cadastrada": 
         id_filtrado = df_empresas[df_empresas['razao_social'] == emp_selecionada_nome]['id'].values 
-        empresa_id_ativa = int(id_filtrado[0]) if len(id_filtrado) > 0 else 1 
+        empresa_id_ativa = int(id_filtrado) if len(id_filtrado) > 0 else 1 
     else: 
         empresa_id_ativa = 1 
         
