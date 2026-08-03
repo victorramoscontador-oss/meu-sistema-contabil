@@ -27,7 +27,6 @@ def inicializar_supabase() -> Client:
         return None 
 
 supabase = inicializar_supabase() 
-
 # Injeção de Identidade Visual via CSS (Estilos de Impressão PDF Inclusos) 
 str.markdown(""" 
  <style> 
@@ -167,7 +166,6 @@ def buscar_participantes(empresa_id):
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(dados_part) 
     except Exception: 
         return pd.DataFrame(dados_part) 
-
 @str.cache_data(ttl=5) 
 def buscar_acumuladores(empresa_id): 
     dados_acum = [{"id": 1, "operacao": "Rateio de Condomínio Geral", "aliquota": 0.0}] 
@@ -187,6 +185,7 @@ def buscar_historicos(empresa_id):
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(dados_hist) 
     except Exception: 
         return pd.DataFrame(dados_hist) 
+
 @str.cache_data(ttl=5) 
 def buscar_regras_ofx(empresa_id): 
     regras_padrao = [ 
@@ -265,11 +264,18 @@ def renderizar_modulo_lancamentos(empresa_id):
             
             opcoes_codigos = df_plano['codigo'].tolist() if not df_plano.empty else [""] 
             c_debito = str.selectbox("Conta de Débito (Aplicação)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
-            c_credito = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
+            c_cred = str.selectbox("Conta de Crédito (Origem)", options=opcoes_codigos, format_func=formatar_opcao_conta) 
             
             if str.form_submit_button("Gravar Lançamento") and supabase: 
-                # CONSERTO AQUI: Convertido o campo data para string no padrão ISO correto do banco de dados (YYYY-MM-DD)
-                payload = {"data": data_lan.strftime('%Y-%m-%d'), "conta_debito": c_debito, "conta_credito": c_credito, "valor": valor_lan, "historico": str(historico_lan), "empresa_id": empresa_id} 
+                texto_historico_final = f"{historico_lan}"
+                payload = {
+                    "data": data_lan.strftime('%Y-%m-%d'), 
+                    "conta_debito": c_debito, 
+                    "conta_credito": c_credito, 
+                    "valor": valor_lan, 
+                    "historico": texto_historico_final, 
+                    "empresa_id": empresa_id
+                } 
                 supabase.table("lancamentos").insert(payload).execute() 
                 str.success("Lançamento gravado com sucesso!") 
                 str.cache_data.clear() 
@@ -289,7 +295,7 @@ def renderizar_modulo_lancamentos(empresa_id):
             if str.form_submit_button("Processar e Escriturar Nota") and supabase: 
                 payload_nota = {"data": "2026-07-31", "conta_debito": c_despesa, "conta_credito": c_origem, "valor": v_bruto, "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}", "empresa_id": empresa_id} 
                 supabase.table("lancamentos").insert(payload_nota).execute() 
-                str.success(f"Nota Fiscal {num_nota} integrada ao diário contábil!") 
+                str.success(f"Nota Fiscal {num_nota} integrated ao diário contábil!") 
                 str.cache_data.clear() 
     
     with aba3: 
@@ -330,7 +336,6 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
     df_plano = buscar_plano_contas(empresa_id) 
     df_balancete = processar_balancete_df(df_lanc, df_plano, d_fim) 
     
-    # CONSERTO AQUI: Substituído o botão quebrado por um componente HTML/JS isolado funcional do navegador para abrir a impressão em PDF
     components.html("""
         <button onclick="window.print()" style="background-color:#00ff66; color:#0b2216; padding:10px 20px; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-family: sans-serif; width: 100%;">
             🖨️ Imprimir / Salvar em PDF
@@ -386,7 +391,10 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
 
 def renderizar_modulo_cadastros(empresa_id): 
     str.header("Painel de Cadastros Estruturais") 
-    aba_emp, aba_contas, aba_part, aba_acum, aba_hist = str.tabs(["Empresas", "Contas Contábeis", "Clientes/Fornecedores", "Acumuladores Fiscais", "Históricos Padrão"]) 
+    aba_emp, aba_contas, aba_part, aba_acum, aba_hist, aba_ofx_regra = str.tabs([
+        "Empresas", "Contas Contábeis", "Clientes/Fornecedores", 
+        "Acumuladores Fiscais", "Históricos Padrão", "Mapeamento de Regras OFX"
+    ]) 
     
     with aba_emp: 
         str.subheader("Carteira de Empresas Cliente") 
@@ -453,6 +461,20 @@ def renderizar_modulo_cadastros(empresa_id):
                 str.success("Histórico salvo!") 
                 str.cache_data.clear() 
                 str.rerun() 
+
+    with aba_ofx_regra:
+        str.subheader("Regras de Mapeamento Automatizado do OFX")
+        df_regras_visualizar = buscar_regras_ofx(empresa_id)
+        str.dataframe(df_regras_visualizar, use_container_width=True, hide_index=True)
+        with str.form("form_ofx_regra", clear_on_submit=True):
+            palavra_chave = str.text_input("Palavra-Chave do Extrato (Ex: PIX RECEB)")
+            c_deb = str.text_input("Conta de Débito Padrão")
+            c_cred = str.text_input("Conta de Crédito Padrão")
+            if str.form_submit_button("Salvar Nova Regra OFX") and supabase:
+                supabase.table("regras_mapeamento_ofx").insert({"palavra_chave": palavra_chave, "conta_debito": c_deb, "conta_credito": c_cred, "empresa_id": empresa_id}).execute()
+                str.success("Regra de conciliação salva com sucesso!") 
+                str.cache_data.clear()
+                str.rerun()
 
 def main(): 
     str.sidebar.markdown('<div class="logo-texto">&gt;&gt;&lt;&lt;</div>', unsafe_allow_html=True) 
