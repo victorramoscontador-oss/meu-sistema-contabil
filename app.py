@@ -276,9 +276,17 @@ def renderizar_modulo_lancamentos(empresa_id):
                     "historico": str(historico_lan), 
                     "empresa_id": empresa_id 
                 } 
-                supabase.table("lancamentos").insert(payload).execute() 
-                st.success("Lançamento gravado com sucesso!") 
-                st.cache_data.clear() 
+                try:
+    resposta = supabase.table("lancamentos").insert(payload).execute()
+
+    st.success("Lançamento gravado com sucesso!")
+    st.write(resposta)
+
+    st.cache_data.clear()
+
+except Exception as e:
+    st.error("ERRO AO GRAVAR O LANÇAMENTO")
+    st.code(str(e))
                 
     with aba2: 
         st.subheader("Escrituração Real de Notas Fiscais") 
