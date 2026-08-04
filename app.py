@@ -277,6 +277,7 @@ def renderizar_modulo_lancamentos(empresa_id):
                     "empresa_id": empresa_id 
                 } 
                 try:
+                 try:
     resposta = supabase.table("lancamentos").insert(payload).execute()
 
     st.success("Lançamento gravado com sucesso!")
