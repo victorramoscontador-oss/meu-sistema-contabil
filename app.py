@@ -1,11 +1,10 @@
+import re
 import streamlit as st
 import pandas as pd
 from supabase import create_client, Client
 import streamlit.components.v1 as components
 
-# ==============================================================================
-# CONFIGURAÇÃO DA PÁGINA (precisa ser o primeiro comando Streamlit)
-# ==============================================================================
+# Configuração da página (Primeiro comando Streamlit)
 st.set_page_config(
     page_title="Fluxo Assessoria Empresarial",
     page_icon="💼",
@@ -14,33 +13,23 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# CREDENCIAIS E CONFIGURAÇÃO
-# ------------------------------------------------------------------------------
-# Aqui o app tenta ler as credenciais de um lugar seguro (st.secrets).
-# Se você ainda não configurou isso, ele usa os valores abaixo como reserva
-# para o app continuar funcionando — mas o ideal é migrar para o secrets.toml
-# (tem um passo a passo depois do código).
+# CREDENCIAIS — lidas de .streamlit/secrets.toml, NUNCA do código-fonte.
+# Isso evita que a chave do Supabase e a senha do sistema fiquem expostas
+# para sempre no histórico do GitHub assim que o repositório for enviado.
 # ==============================================================================
-def obter_config(chave, valor_reserva):
-    try:
-        return st.secrets[chave]
-    except Exception:
-        return valor_reserva
+try:
+    SUPABASE_URL = st.secrets["supabase"]["url"]
+    SUPABASE_KEY = st.secrets["supabase"]["key"]
+    USUARIO_CORRETO = st.secrets["auth"]["usuario"]
+    SENHA_CORRETA = st.secrets["auth"]["senha"]
+except Exception:
+    st.error(
+        "Configuração ausente. Crie o arquivo `.streamlit/secrets.toml` "
+        "com as credenciais do Supabase e o login do sistema (veja o README.md)."
+    )
+    st.stop()
 
-# URL CORRIGIDA: o valor original ("https://supabase.co") não era um projeto
-# real. O código do projeto ("ref") estava dentro da própria chave (JWT) que
-# você me enviou — por isso os lançamentos nunca eram gravados de verdade.
-SUPABASE_URL = obter_config("SUPABASE_URL", "https://hcgtyuwzzhzhetvjijix.supabase.co")
-SUPABASE_KEY = obter_config(
-    "SUPABASE_KEY",
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhjZ3R5dXd6emh6aGV0dmppaml4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU0MTc3NDAsImV4cCI6MjEwMDk5Mzc0MH0._b3waLLjoYLL_VyCWGaksovJKr4ZZi-fo2EA2z9vRpA"
-)
-USUARIO_CORRETO = obter_config("USUARIO_CORRETO", "contador")
-SENHA_CORRETA = obter_config("SENHA_CORRETA", "admin123")
 
-# ==============================================================================
-# INICIALIZAÇÃO DO BANCO DE DADOS
-# ==============================================================================
 @st.cache_resource
 def inicializar_supabase() -> Client:
     try:
@@ -49,11 +38,26 @@ def inicializar_supabase() -> Client:
         st.error(f"Erro de conexão com o Supabase: {e}")
         return None
 
+
 supabase = inicializar_supabase()
 
-# ==============================================================================
-# IDENTIDADE VISUAL (CSS)
-# ==============================================================================
+
+def executar_insert(tabela: str, payload: dict, mensagem_sucesso: str) -> bool:
+    """Grava um registro no Supabase e mostra um erro compreensível em vez de travar a tela."""
+    if not supabase:
+        st.error("Sem conexão com o banco de dados. Verifique as credenciais em secrets.toml.")
+        return False
+    try:
+        supabase.table(tabela).insert(payload).execute()
+        st.success(mensagem_sucesso)
+        st.cache_data.clear()
+        return True
+    except Exception as e:
+        st.error(f"Não foi possível salvar o registro: {e}")
+        return False
+
+
+# Injeção de Identidade Visual via CSS (Estilos de Impressão PDF Inclusos)
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700;900&display=swap');
@@ -119,13 +123,6 @@ html, body, [data-testid="stSidebar"] {
 </style>
 """, unsafe_allow_html=True)
 
-# ==============================================================================
-# CONTROLE DE ACESSO (LOGIN)
-# ------------------------------------------------------------------------------
-# CORREÇÃO CRÍTICA: antes, se ninguém clicasse em "Entrar", o script continuava
-# rodando e mostrava o sistema inteiro sem senha nenhuma. Agora, com o
-# st.stop() no final do bloco, o app REALMENTE para aqui até o login ser feito.
-# ==============================================================================
 if 'autenticado' not in st.session_state:
     st.session_state['autenticado'] = False
 
@@ -144,11 +141,10 @@ if not st.session_state['autenticado']:
                 st.rerun()
             else:
                 st.error("Usuário ou senha inválidos.")
-
-    st.stop()  # <- ESSENCIAL: impede que o resto do app rode sem login
+    st.stop()
 
 # ==============================================================================
-# CAMADA DE DADOS
+# CAMADA DE DADOS E CARGA DE CONTAS BASEADA NO BALANCETE REAL DO HARDMAN FLAT
 # ==============================================================================
 @st.cache_data(ttl=5)
 def buscar_empresas_contabilidade():
@@ -161,9 +157,9 @@ def buscar_empresas_contabilidade():
     try:
         resposta = supabase.table("empresas_clientes").select("id, razao_social, cnpj").execute()
         return pd.DataFrame(resposta.data) if (resposta.data and len(resposta.data) > 0) else pd.DataFrame(empresas_padrao)
-    except Exception as e:
-        st.sidebar.warning(f"Não foi possível buscar empresas no banco: {e}")
+    except Exception:
         return pd.DataFrame(empresas_padrao)
+
 
 @st.cache_data(ttl=5)
 def buscar_plano_contas(empresa_id):
@@ -189,9 +185,9 @@ def buscar_plano_contas(empresa_id):
     try:
         resposta = supabase.table("plano_contas").select("codigo, descricao, tipo, nivel").eq("empresa_id", empresa_id).execute()
         return pd.DataFrame(resposta.data) if (resposta.data and len(resposta.data) > 0) else pd.DataFrame(dados_hardman)
-    except Exception as e:
-        st.warning(f"Não foi possível buscar o plano de contas no banco: {e}")
+    except Exception:
         return pd.DataFrame(dados_hardman)
+
 
 @st.cache_data(ttl=5)
 def buscar_participantes(empresa_id):
@@ -204,9 +200,9 @@ def buscar_participantes(empresa_id):
     try:
         resposta = supabase.table("participantes").select("id, nome, documento, tipo").eq("empresa_id", empresa_id).execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(dados_part)
-    except Exception as e:
-        st.warning(f"Não foi possível buscar participantes no banco: {e}")
+    except Exception:
         return pd.DataFrame(dados_part)
+
 
 @st.cache_data(ttl=5)
 def buscar_acumuladores(empresa_id):
@@ -216,9 +212,9 @@ def buscar_acumuladores(empresa_id):
     try:
         resposta = supabase.table("acumuladores").select("id, operacao, aliquota").eq("empresa_id", empresa_id).execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(dados_acum)
-    except Exception as e:
-        st.warning(f"Não foi possível buscar acumuladores no banco: {e}")
+    except Exception:
         return pd.DataFrame(dados_acum)
+
 
 @st.cache_data(ttl=5)
 def buscar_historicos(empresa_id):
@@ -228,9 +224,9 @@ def buscar_historicos(empresa_id):
     try:
         resposta = supabase.table("historicos_padrao").select("id, descricao").eq("empresa_id", empresa_id).execute()
         return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(dados_hist)
-    except Exception as e:
-        st.warning(f"Não foi possível buscar históricos no banco: {e}")
+    except Exception:
         return pd.DataFrame(dados_hist)
+
 
 @st.cache_data(ttl=5)
 def buscar_regras_ofx(empresa_id):
@@ -243,45 +239,28 @@ def buscar_regras_ofx(empresa_id):
     try:
         resposta = supabase.table("regras_mapeamento_ofx").select("palavra_chave, conta_debito, conta_credito").eq("empresa_id", empresa_id).execute()
         return pd.DataFrame(resposta.data) if (resposta.data and len(resposta.data) > 0) else pd.DataFrame(regras_padrao)
-    except Exception as e:
-        st.warning(f"Não foi possível buscar regras de OFX no banco: {e}")
+    except Exception:
         return pd.DataFrame(regras_padrao)
+
 
 @st.cache_data(ttl=2)
 def buscar_lancamentos(data_inicio, data_fim, empresa_id):
-    colunas_vazias = ["id", "data", "conta_debito", "conta_credito", "valor", "historico"]
     if not supabase:
-        return pd.DataFrame(columns=colunas_vazias)
+        return pd.DataFrame(columns=["id", "data", "conta_debito", "conta_credito", "valor", "historico"])
     try:
-        resposta = supabase.table("lancamentos").select("id, data, conta_debito, conta_credito, valor, historico") \
-            .eq("empresa_id", empresa_id) \
-            .gte("data", data_inicio.strftime('%Y-%m-%d')) \
+        resposta = supabase.table("lancamentos").select("id, data, conta_debito, conta_credito, valor, historico")\
+            .eq("empresa_id", empresa_id)\
+            .gte("data", data_inicio.strftime('%Y-%m-%d'))\
             .lte("data", data_fim.strftime('%Y-%m-%d')).execute()
-        return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(columns=colunas_vazias)
-    except Exception as e:
-        st.warning(f"Não foi possível buscar lançamentos no banco: {e}")
-        return pd.DataFrame(columns=colunas_vazias)
-
-
-def gravar_lancamento(payload):
-    """Grava um lançamento no Supabase e mostra erro claro se algo falhar."""
-    if not supabase:
-        st.error("Sem conexão com o banco de dados. Lançamento não foi salvo.")
-        return False
-    try:
-        supabase.table("lancamentos").insert(payload).execute()
-        return True
-    except Exception as e:
-        st.error(f"Erro ao gravar lançamento no banco: {e}")
-        return False
+        return pd.DataFrame(resposta.data) if resposta.data else pd.DataFrame(columns=["id", "data", "conta_debito", "conta_credito", "valor", "historico"])
+    except Exception:
+        return pd.DataFrame(columns=["id", "data", "conta_debito", "conta_credito", "valor", "historico"])
 
 
 def processar_balancete_df(df_lancamentos, df_plano, data_limite):
     if df_plano.empty:
         return pd.DataFrame(columns=["Código", "Descrição", "Débito", "Crédito", "Saldo Atual", "Nível", "Tipo"])
-
     saldos = {row['codigo']: {'debito': 0.0, 'credito': 0.0} for _, row in df_plano.iterrows()}
-
     if not df_lancamentos.empty:
         df_filtrado = df_lancamentos[pd.to_datetime(df_lancamentos['data']) <= pd.to_datetime(data_limite)]
         for _, lanc in df_filtrado.iterrows():
@@ -290,25 +269,41 @@ def processar_balancete_df(df_lancamentos, df_plano, data_limite):
                 saldos[deb]['debito'] += val
             if cred in saldos:
                 saldos[cred]['credito'] += val
-
-    def pertence_ao_grupo(codigo_lancamento, codigo_grupo):
-        # CORREÇÃO: antes, "1.10" era considerado (erradamente) parte do
-        # grupo "1.1" porque a string "1.10" começa com "1.1". Agora só
-        # soma se for exatamente a conta ou um "filho" real dela (separado
-        # por ponto), evitando misturar contas parecidas.
-        return codigo_lancamento == codigo_grupo or codigo_lancamento.startswith(codigo_grupo + ".")
-
     balancete_dados = []
     for _, conta in df_plano.iterrows():
         cod, tipo = conta['codigo'], conta['tipo']
-        total_deb = sum(valores['debito'] for c_cod, valores in saldos.items() if pertence_ao_grupo(c_cod, cod))
-        total_cred = sum(valores['credito'] for c_cod, valores in saldos.items() if pertence_ao_grupo(c_cod, cod))
+        total_deb = sum(valores['debito'] for c_cod, valores in saldos.items() if c_cod.startswith(cod))
+        total_cred = sum(valores['credito'] for c_cod, valores in saldos.items() if c_cod.startswith(cod))
         saldo_atual = (total_deb - total_cred) if tipo in ['Ativo', 'Despesa'] else (total_cred - total_deb)
         balancete_dados.append({
             "Código": cod, "Descrição": conta['descricao'], "Tipo": tipo,
             "Nível": conta['nivel'] if 'nivel' in conta else 5, "Débito": total_deb, "Crédito": total_cred, "Saldo Atual": saldo_atual
         })
     return pd.DataFrame(balancete_dados)
+
+
+def processar_arquivo_ofx(conteudo: str):
+    """Lê um arquivo OFX de verdade (os bancos usam SGML, não XML válido,
+    por isso aqui a extração é feita por marcação de tag, não por parser de XML)."""
+    transacoes = []
+    blocos = re.findall(r"<STMTTRN>(.*?)</STMTTRN>", conteudo, re.DOTALL | re.IGNORECASE)
+    for bloco in blocos:
+        data_m = re.search(r"<DTPOSTED>([^<\r\n]+)", bloco, re.IGNORECASE)
+        valor_m = re.search(r"<TRNAMT>([^<\r\n]+)", bloco, re.IGNORECASE)
+        texto_m = re.search(r"<MEMO>([^<\r\n]+)", bloco, re.IGNORECASE) or re.search(r"<NAME>([^<\r\n]+)", bloco, re.IGNORECASE)
+        if not (data_m and valor_m):
+            continue
+        data_bruta = data_m.group(1).strip()[:8]
+        if len(data_bruta) != 8 or not data_bruta.isdigit():
+            continue
+        data_formatada = f"{data_bruta[0:4]}-{data_bruta[4:6]}-{data_bruta[6:8]}"
+        try:
+            valor = float(valor_m.group(1).strip())
+        except ValueError:
+            continue
+        documento = texto_m.group(1).strip() if texto_m else "Sem descrição"
+        transacoes.append({"Data": data_formatada, "Documento": documento, "Valor": valor})
+    return transacoes
 
 
 def renderizar_modulo_lancamentos(empresa_id):
@@ -347,8 +342,6 @@ def renderizar_modulo_lancamentos(empresa_id):
 
                 if not conta_debito_puro or not conta_credito_puro:
                     st.error("Selecione a conta de débito e a conta de crédito antes de gravar.")
-                elif conta_debito_puro == conta_credito_puro:
-                    st.error("A conta de débito e a de crédito não podem ser a mesma.")
                 elif not historico_lan:
                     st.error("Informe um histórico para o lançamento.")
                 else:
@@ -360,15 +353,14 @@ def renderizar_modulo_lancamentos(empresa_id):
                         "historico": str(historico_lan),
                         "empresa_id": empresa_id
                     }
-                    if gravar_lancamento(payload):
-                        st.success("Lançamento gravado com sucesso!")
-                        st.cache_data.clear()
+                    executar_insert("lancamentos", payload, "Lançamento gravado com sucesso!")
 
     with aba2:
         st.subheader("Escrituração Real de Notas Fiscais")
         with st.form("form_nota_fiscal", clear_on_submit=True):
-            col_n1, col_n2, col_n3 = st.columns(3)
+            col_n1, col_n2 = st.columns(2)
             num_nota = col_n1.text_input("Número da NF-e / NFS-e")
+            data_nota = col_n2.date_input("Data da Nota", format="DD/MM/YYYY")
             partic = st.selectbox("Participante Vinculado", options=df_part['nome'].tolist() if not df_part.empty else [""])
             acum = st.selectbox("Operação / Acumulador", options=df_acum['operacao'].tolist() if not df_acum.empty else [""])
             v_bruto = st.number_input("Valor Bruto da Nota (R$)", min_value=0.01)
@@ -378,63 +370,70 @@ def renderizar_modulo_lancamentos(empresa_id):
             if st.form_submit_button("Processar e Escriturar Nota"):
                 c_desp_puro = c_despesa_sel.split(" - ")[0] if c_despesa_sel else ""
                 c_orig_puro = c_origem_sel.split(" - ")[0] if c_origem_sel else ""
-
-                if not num_nota:
-                    st.error("Informe o número da nota fiscal.")
-                elif not c_desp_puro or not c_orig_puro:
-                    st.error("Selecione as duas contas contábeis da nota.")
+                if not c_desp_puro or not c_orig_puro:
+                    st.error("Selecione as duas contas contábeis da nota antes de processar.")
                 else:
                     payload_nota = {
-                        "data": pd.Timestamp.today().strftime('%Y-%m-%d'),
+                        "data": data_nota.strftime('%Y-%m-%d'),
                         "conta_debito": str(c_desp_puro).strip(),
                         "conta_credito": str(c_orig_puro).strip(),
                         "valor": v_bruto,
                         "historico": f"Ref. NF-e Num {num_nota} - Part: {partic} - Op: {acum}",
                         "empresa_id": empresa_id
                     }
-                    if gravar_lancamento(payload_nota):
-                        st.success(f"Nota Fiscal {num_nota} integrada ao diário contábil!")
-                        st.cache_data.clear()
+                    executar_insert("lancamentos", payload_nota, f"Nota Fiscal {num_nota} integrada ao diário contábil!")
 
     with aba3:
         st.subheader("Processador de Extratos Bancários OFX")
         arquivo_ofx = st.file_uploader("Selecione o arquivo .ofx", type=["ofx"])
         if arquivo_ofx is not None:
-            # NOTA: esta parte ainda usa dados de exemplo fixos (não lê o
-            # arquivo .ofx de verdade). A leitura real do arquivo enviado
-            # é um próximo passo que podemos implementar quando quiser.
-            extrato_dados = [
-                {"Data": "2026-07-10", "Documento": "TRF 4930", "Valor": 150.00},
-                {"Data": "2026-07-12", "Documento": "PIX RECEB VENDA", "Valor": 1200.00}
-            ]
-            analise_regras = []
-            for item in extrato_dados:
-                deb, cred, status = "", "", " Sem Regra"
-                for _, r in df_regras.iterrows():
-                    if r['palavra_chave'] in item['Documento']:
-                        deb, cred, status = r['conta_debito'], r['conta_credito'], " Identificada"
-                        break
-                analise_regras.append({"Data": item['Data'], "Documento": item['Documento'], "Valor": item['Valor'], "Débito": deb, "Crédito": cred, "Status": status})
+            conteudo_bytes = arquivo_ofx.read()
+            try:
+                conteudo = conteudo_bytes.decode("utf-8")
+            except UnicodeDecodeError:
+                conteudo = conteudo_bytes.decode("latin-1", errors="ignore")
 
-            df_reconciliado = pd.DataFrame(analise_regras)
-            st.dataframe(df_reconciliado, use_container_width=True, hide_index=True)
-            if st.button("Confirmar Importação OFX no Diário"):
-                sucesso_total = True
-                for _, row in df_reconciliado.iterrows():
-                    if "Identificada" in row['Status']:
-                        payload_ofx = {
-                            "data": row['Data'],
-                            "conta_debito": str(row['Débito']).strip(),
-                            "conta_credito": str(row['Crédito']).strip(),
-                            "valor": float(row['Valor']),
-                            "historico": f"OFX Auto: {row['Documento']}",
-                            "empresa_id": empresa_id
-                        }
-                        if not gravar_lancamento(payload_ofx):
-                            sucesso_total = False
-                if sucesso_total:
-                    st.success("Transações mapeadas gravadas!")
+            extrato_dados = processar_arquivo_ofx(conteudo)
+
+            if not extrato_dados:
+                st.warning("Não foi possível identificar transações neste arquivo. Confira se é um OFX válido exportado pelo banco.")
+            else:
+                analise_regras = []
+                for item in extrato_dados:
+                    deb, cred, status = "", "", "Sem Regra"
+                    for _, r in df_regras.iterrows():
+                        if r['palavra_chave'] in item['Documento']:
+                            deb, cred, status = r['conta_debito'], r['conta_credito'], "Identificada"
+                            break
+                    analise_regras.append({"Data": item['Data'], "Documento": item['Documento'], "Valor": item['Valor'], "Débito": deb, "Crédito": cred, "Status": status})
+
+                df_reconciliado = pd.DataFrame(analise_regras)
+                st.dataframe(df_reconciliado, use_container_width=True, hide_index=True)
+                if st.button("Confirmar Importação OFX no Diário"):
+                    erros = 0
+                    gravados = 0
+                    for _, row in df_reconciliado.iterrows():
+                        if "Identificada" in row['Status']:
+                            payload_ofx = {
+                                "data": row['Data'],
+                                "conta_debito": str(row['Débito']).strip(),
+                                "conta_credito": str(row['Crédito']).strip(),
+                                "valor": float(row['Valor']),
+                                "historico": f"OFX Auto: {row['Documento']}",
+                                "empresa_id": empresa_id
+                            }
+                            if supabase:
+                                try:
+                                    supabase.table("lancamentos").insert(payload_ofx).execute()
+                                    gravados += 1
+                                except Exception as e:
+                                    erros += 1
+                                    st.error(f"Falha ao gravar '{row['Documento']}': {e}")
                     st.cache_data.clear()
+                    if gravados:
+                        st.success(f"{gravados} transação(ões) gravada(s) no diário.")
+                    if erros == 0 and gravados == 0:
+                        st.info("Nenhuma transação com regra identificada para importar.")
 
 
 def renderizar_demonstracoes(empresa_id, nome_empresa):
@@ -443,17 +442,13 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
     d_ini = col1.date_input("Início", pd.to_datetime("2026-01-01"), format="DD/MM/YYYY")
     d_fim = col2.date_input("Fim", pd.to_datetime("2026-12-31"), format="DD/MM/YYYY")
 
-    if d_fim < d_ini:
-        st.error("A data final não pode ser anterior à data inicial.")
-        return
-
     df_lanc = buscar_lancamentos(d_ini, d_fim, empresa_id)
     df_plano = buscar_plano_contas(empresa_id)
     df_balancete = processar_balancete_df(df_lanc, df_plano, d_fim)
 
     components.html("""
     <button onclick="window.print()" style="background-color:#00ff66; color:#0b2216; padding:10px 20px; border:none; border-radius:5px; font-weight:bold; cursor:pointer; font-family: sans-serif; width: 100%;">
-        🖨️ Imprimir / Salvar em PDF
+    🖨️ Imprimir / Salvar em PDF
     </button>
     """, height=50)
 
@@ -469,12 +464,8 @@ def renderizar_demonstracoes(empresa_id, nome_empresa):
     with aba_rep2:
         st.subheader("Demonstração do Resultado do Exercício Estruturada")
         if not df_balancete.empty:
-            def obter_saldo(codigo_exato):
-                # CORREÇÃO: antes exigia Nível == 1, o que fazia "Deduções"
-                # (código "3.2") e "Custos" (código "5") sempre darem zero,
-                # pois nenhuma conta de nível 1 tem esses códigos. Agora
-                # busca a conta exata, já com o total agregado corretamente.
-                filtro = df_balancete[df_balancete['Código'] == codigo_exato]
+            def obter_saldo(prefixo):
+                filtro = df_balancete[df_balancete['Código'].str.startswith(prefixo) & (df_balancete['Nível'] == 1)]
                 return float(filtro['Saldo Atual'].values[0]) if not filtro.empty else 0.0
 
             rec_bruta = obter_saldo("3")
@@ -523,16 +514,8 @@ def renderizar_modulo_cadastros(empresa_id):
             rz = st.text_input("Razão Social")
             cn = st.text_input("CNPJ")
             if st.form_submit_button("Salvar Empresa"):
-                if not rz or not cn:
-                    st.error("Preencha Razão Social e CNPJ.")
-                elif supabase:
-                    try:
-                        supabase.table("empresas_clientes").insert({"razao_social": rz, "cnpj": cn}).execute()
-                        st.success("Empresa cadastrada!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar empresa: {e}")
+                if executar_insert("empresas_clientes", {"razao_social": rz, "cnpj": cn}, "Empresa cadastrada!"):
+                    st.rerun()
 
     with aba_contas:
         st.subheader("Plano de Contas Vinculado")
@@ -543,16 +526,9 @@ def renderizar_modulo_cadastros(empresa_id):
             c_des = st.text_input("Descrição")
             c_tp = st.selectbox("Tipo", ["Ativo", "Passivo", "Patrimônio Líquido", "Receita", "Despesa"])
             if st.form_submit_button("Salvar Conta"):
-                if not c_cod or not c_des:
-                    st.error("Preencha o código e a descrição da conta.")
-                elif supabase:
-                    try:
-                        supabase.table("plano_contas").insert({"codigo": c_cod, "descricao": c_des, "tipo": c_tp, "nivel": 5, "empresa_id": empresa_id}).execute()
-                        st.success("Conta salva!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar conta: {e}")
+                payload = {"codigo": c_cod, "descricao": c_des, "tipo": c_tp, "nivel": 5, "empresa_id": empresa_id}
+                if executar_insert("plano_contas", payload, "Conta salva!"):
+                    st.rerun()
 
     with aba_part:
         st.subheader("Clientes e Fornecedores")
@@ -563,16 +539,9 @@ def renderizar_modulo_cadastros(empresa_id):
             p_doc = st.text_input("CPF/CNPJ")
             p_tp = st.selectbox("Tipo", ["Fornecedor", "Cliente"])
             if st.form_submit_button("Salvar Participante"):
-                if not p_nom or not p_doc:
-                    st.error("Preencha nome e CPF/CNPJ.")
-                elif supabase:
-                    try:
-                        supabase.table("participantes").insert({"nome": p_nom, "documento": p_doc, "tipo": p_tp, "empresa_id": empresa_id}).execute()
-                        st.success("Participante salvo!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar participante: {e}")
+                payload = {"nome": p_nom, "documento": p_doc, "tipo": p_tp, "empresa_id": empresa_id}
+                if executar_insert("participantes", payload, "Participante salvo!"):
+                    st.rerun()
 
     with aba_acum:
         st.subheader("Acumuladores / Operações Fiscais")
@@ -582,16 +551,9 @@ def renderizar_modulo_cadastros(empresa_id):
             a_op = st.text_input("Nome da Operação")
             a_al = st.number_input("Alíquota (%)", min_value=0.0)
             if st.form_submit_button("Salvar Acumulador"):
-                if not a_op:
-                    st.error("Preencha o nome da operação.")
-                elif supabase:
-                    try:
-                        supabase.table("acumuladores").insert({"operacao": a_op, "aliquota": a_al, "empresa_id": empresa_id}).execute()
-                        st.success("Acumulador cadastrado!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar acumulador: {e}")
+                payload = {"operacao": a_op, "aliquota": a_al, "empresa_id": empresa_id}
+                if executar_insert("acumuladores", payload, "Acumulador cadastrado!"):
+                    st.rerun()
 
     with aba_hist:
         st.subheader("Históricos Contábeis Padrão")
@@ -600,16 +562,9 @@ def renderizar_modulo_cadastros(empresa_id):
         with st.form("form_hist", clear_on_submit=True):
             h_ds = st.text_input("Texto do Histórico")
             if st.form_submit_button("Salvar Histórico"):
-                if not h_ds:
-                    st.error("Preencha o texto do histórico.")
-                elif supabase:
-                    try:
-                        supabase.table("historicos_padrao").insert({"descricao": h_ds, "empresa_id": empresa_id}).execute()
-                        st.success("Histórico salvo!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar histórico: {e}")
+                payload = {"descricao": h_ds, "empresa_id": empresa_id}
+                if executar_insert("historicos_padrao", payload, "Histórico salvo!"):
+                    st.rerun()
 
     with aba_ofx_regra:
         st.subheader("Regras de Mapeamento Automatizado do OFX")
@@ -620,16 +575,9 @@ def renderizar_modulo_cadastros(empresa_id):
             c_deb = st.text_input("Conta de Débito Padrão")
             c_cred = st.text_input("Conta de Crédito Padrão")
             if st.form_submit_button("Salvar Nova Regra OFX"):
-                if not palavra_chave or not c_deb or not c_cred:
-                    st.error("Preencha todos os campos da regra.")
-                elif supabase:
-                    try:
-                        supabase.table("regras_mapeamento_ofx").insert({"palavra_chave": palavra_chave, "conta_debito": c_deb, "conta_credito": c_cred, "empresa_id": empresa_id}).execute()
-                        st.success("Regra de conciliação salva com sucesso!")
-                        st.cache_data.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erro ao salvar regra OFX: {e}")
+                payload = {"palavra_chave": palavra_chave, "conta_debito": c_deb, "conta_credito": c_cred, "empresa_id": empresa_id}
+                if executar_insert("regras_mapeamento_ofx", payload, "Regra de conciliação salva com sucesso!"):
+                    st.rerun()
 
 
 def main():
